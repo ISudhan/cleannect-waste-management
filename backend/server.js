@@ -14,7 +14,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // MongoDB Connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/cleannect';
+const MONGODB_URI = 'mongodb://localhost:27017/cleannect';
 
 mongoose.connect(MONGODB_URI)
   .then(() => {
