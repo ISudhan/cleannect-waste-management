@@ -4,6 +4,7 @@ import About from './components/About';
 import Signup from './components/Signup';
 import Signin from './components/Signin';
 import ServicesAndSupport from './components/ServicesAndSupport';
+import Hero from './components/Hero';
 
 function App() {
   return (
@@ -14,7 +15,8 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/signin" element={<Signin/>} />
         <Route path="/services" element={<ServicesAndSupport/>} />
-        {/* Add other routes */}
+        <Route path="/hero" element={<Hero/>} />
+       
       </Routes>
     </Router>
   );
