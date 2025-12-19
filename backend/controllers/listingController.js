@@ -131,14 +131,6 @@ exports.createListing = async (req, res) => {
       });
     }
 
-    // Check if user is seller
-    if (req.user.role !== 'seller' && req.user.role !== 'both') {
-      return res.status(403).json({
-        success: false,
-        message: 'Only sellers can create listings',
-      });
-    }
-
     const listingData = {
       ...req.body,
       seller: req.user.id,
