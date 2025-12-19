@@ -16,7 +16,7 @@ exports.getProfile = async (req, res) => {
           name: user.name,
           email: user.email,
           phone: user.phone,
-          role: user.role,
+          // Role removed - all users can buy and sell
           address: user.address,
           profilePicture: user.profilePicture,
           rating: user.rating,
@@ -50,7 +50,7 @@ exports.updateProfile = async (req, res) => {
     const fieldsToUpdate = {
       name: req.body.name,
       phone: req.body.phone,
-      role: req.body.role,
+      // Role removed - all users can buy and sell regardless of role
       address: req.body.address,
       profilePicture: req.body.profilePicture,
     };
@@ -77,7 +77,7 @@ exports.updateProfile = async (req, res) => {
           name: user.name,
           email: user.email,
           phone: user.phone,
-          role: user.role,
+          // Role removed - all users can buy and sell
           address: user.address,
           profilePicture: user.profilePicture,
           rating: user.rating,
@@ -115,7 +115,7 @@ exports.getUserById = async (req, res) => {
           name: user.name,
           email: user.email,
           phone: user.phone,
-          role: user.role,
+          // Role removed - all users can buy and sell
           address: user.address,
           profilePicture: user.profilePicture,
           rating: user.rating,

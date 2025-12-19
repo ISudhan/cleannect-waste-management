@@ -36,6 +36,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ['seller', 'buyer', 'both'],
       default: 'both',
+      // Role is kept for backward compatibility but not enforced - all users can buy and sell
     },
     address: {
       street: { type: String, trim: true },

@@ -4,7 +4,7 @@ const { validationResult } = require('express-validator');
 
 // @desc    Create order
 // @route   POST /api/orders
-// @access  Private (Buyer)
+// @access  Private (Any authenticated user can create orders)
 exports.createOrder = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -106,7 +106,8 @@ exports.getOrders = async (req, res) => {
       query.status = req.query.status;
     }
 
-    // Filter by role (buyer or seller)
+    // Filter by role removed - users can filter by buyer/seller relationship via query params
+    // Keeping query params for backward compatibility but not enforcing role-based restrictions
     if (req.query.role === 'buyer') {
       query.buyer = req.user.id;
       delete query.$or;
@@ -218,18 +219,18 @@ exports.updateOrderStatus = async (req, res) => {
     const isSeller = order.seller.toString() === req.user.id;
     const isBuyer = order.buyer.toString() === req.user.id;
 
-    // Status transition rules
+    // Status transition rules - based on buyer/seller relationship, not user roles
     const allowedTransitions = {
       pending: {
-        confirmed: ['seller'],
-        cancelled: ['buyer', 'seller'],
+        confirmed: ['seller'], // Seller can confirm
+        cancelled: ['buyer', 'seller'], // Both can cancel
       },
       confirmed: {
-        shipped: ['seller'],
-        cancelled: ['buyer', 'seller'],
+        shipped: ['seller'], // Seller can ship
+        cancelled: ['buyer', 'seller'], // Both can cancel
       },
       shipped: {
-        delivered: ['buyer'],
+        delivered: ['buyer'], // Buyer can mark as delivered
       },
       delivered: {},
       cancelled: {},
@@ -245,6 +246,7 @@ exports.updateOrderStatus = async (req, res) => {
       });
     }
 
+    // Check based on buyer/seller relationship, not user role
     const canUpdate =
       (allowedRoles.includes('buyer') && isBuyer) ||
       (allowedRoles.includes('seller') && isSeller);

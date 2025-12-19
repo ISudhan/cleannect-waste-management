@@ -120,7 +120,7 @@ exports.getListing = async (req, res) => {
 
 // @desc    Create listing
 // @route   POST /api/listings
-// @access  Private (Seller)
+// @access  Private (Any authenticated user can create listings)
 exports.createListing = async (req, res) => {
   try {
     const errors = validationResult(req);

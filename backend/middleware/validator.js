@@ -18,7 +18,7 @@ exports.validateRegister = [
   body('email').trim().isEmail().withMessage('Please provide a valid email').normalizeEmail(),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('phone').trim().notEmpty().withMessage('Phone number is required'),
-  body('role').optional().isIn(['seller', 'buyer', 'both']).withMessage('Role must be seller, buyer, or both'),
+  // Role validation removed - all users can buy and sell regardless of role
 ];
 
 // Login validation rules

@@ -24,7 +24,7 @@ router.put(
   [
     body('name').optional().trim().isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters'),
     body('phone').optional().trim().notEmpty().withMessage('Phone number cannot be empty'),
-    body('role').optional().isIn(['seller', 'buyer', 'both']).withMessage('Role must be seller, buyer, or both'),
+    // Role validation removed - all users can buy and sell regardless of role
   ],
   validate,
   updateProfile

@@ -48,6 +48,7 @@ exports.register = async (req, res) => {
           address: user.address,
           profilePicture: user.profilePicture,
           rating: user.rating,
+          // Role removed from response - all users can buy and sell
         },
         token,
       },
@@ -107,6 +108,7 @@ exports.login = async (req, res) => {
           address: user.address,
           profilePicture: user.profilePicture,
           rating: user.rating,
+          // Role removed from response - all users can buy and sell
         },
         token,
       },
