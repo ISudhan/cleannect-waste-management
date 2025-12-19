@@ -14,7 +14,7 @@ exports.register = async (req, res) => {
       });
     }
 
-    const { name, email, password, phone, role, address } = req.body;
+    const { name, email, password, phone, address } = req.body;
 
     // Check if user exists
     const userExists = await User.findOne({ email });
@@ -31,7 +31,6 @@ exports.register = async (req, res) => {
       email,
       password,
       phone,
-      role: role || 'both',
       address,
     });
 
@@ -46,7 +45,6 @@ exports.register = async (req, res) => {
           name: user.name,
           email: user.email,
           phone: user.phone,
-          role: user.role,
           address: user.address,
           profilePicture: user.profilePicture,
           rating: user.rating,
@@ -106,7 +104,6 @@ exports.login = async (req, res) => {
           name: user.name,
           email: user.email,
           phone: user.phone,
-          role: user.role,
           address: user.address,
           profilePicture: user.profilePicture,
           rating: user.rating,
@@ -137,7 +134,6 @@ exports.getMe = async (req, res) => {
           name: user.name,
           email: user.email,
           phone: user.phone,
-          role: user.role,
           address: user.address,
           profilePicture: user.profilePicture,
           rating: user.rating,
