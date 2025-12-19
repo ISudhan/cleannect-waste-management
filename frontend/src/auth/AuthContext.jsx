@@ -23,7 +23,7 @@ export function AuthProvider({ children }) {
     }
     setToken(parsed.token);
     apiClient
-      .get('/auth/me', { token: parsed.token, skipAuthHeader: true })
+      .get('/auth/me')
       .then((res) => {
         setUser(res.data?.data?.user ?? null);
       })

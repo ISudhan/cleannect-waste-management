@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './auth/AuthContext';
 import PublicLayout from './layouts/PublicLayout';
 import DashboardLayout from './layouts/DashboardLayout';
 import LandingPage from './pages/public/LandingPage';
@@ -19,7 +18,6 @@ import ProtectedRoute from './routes/ProtectedRoute';
 
 function App() {
   return (
-    <AuthProvider>
       <BrowserRouter>
         <Routes>
           {/* Public layout */}
@@ -55,7 +53,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
-    </AuthProvider>
+
   );
 }
 
