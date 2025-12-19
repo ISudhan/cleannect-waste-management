@@ -1,13 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../../lib/apiClient';
+import { useAuth } from '../../auth/AuthContext';
 
 function ListingDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showOrderForm, setShowOrderForm] = useState(false);
+  const [orderForm, setOrderForm] = useState({
+    quantity: '',
+    shippingAddress: '',
+  });
+  const [creatingOrder, setCreatingOrder] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,6 +38,37 @@ function ListingDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  const handleOrderFormChange = (e) => {
+    const { name, value } = e.target;
+    setOrderForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleCreateOrder = async (e) => {
+    e.preventDefault();
+    if (!user) {
+      navigate('/auth/login');
+      return;
+    }
+
+    setCreatingOrder(true);
+    setError('');
+    try {
+      const res = await apiClient.post('/orders', {
+        listingId: listing._id,
+        quantity: parseFloat(orderForm.quantity),
+        shippingAddress: orderForm.shippingAddress || undefined,
+      });
+      const order = res.data?.data?.order;
+      if (order) {
+        navigate(`/dashboard/orders/${order._id}`);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to create order.');
+    } finally {
+      setCreatingOrder(false);
+    }
+  };
 
   if (loading) {
     return <div className="text-sm text-slate-600">Loading listing...</div>;
@@ -92,30 +131,101 @@ function ListingDetailPage() {
             <p className="text-xs text-slate-600">Phone: {listing.seller.phone}</p>
           )}
         </div>
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={() =>
-              navigate('/dashboard/messages', {
-                state: { receiverId: listing.seller?._id, listingId: listing._id },
-              })
-            }
-            className="flex w-full items-center justify-center rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 hover:bg-slate-100"
-          >
-            Contact seller
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              navigate('/dashboard/orders', {
-                state: { fromListingId: listing._id },
-              })
-            }
-            className="flex w-full items-center justify-center rounded-md bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700"
-          >
-            Create order
-          </button>
-        </div>
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {error}
+          </div>
+        )}
+        {!showOrderForm ? (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (!user) {
+                  navigate('/auth/login');
+                  return;
+                }
+                navigate('/dashboard/messages', {
+                  state: { receiverId: listing.seller?._id, listingId: listing._id },
+                });
+              }}
+              className="flex w-full items-center justify-center rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 hover:bg-slate-100"
+            >
+              Contact seller
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!user) {
+                  navigate('/auth/login');
+                  return;
+                }
+                if (listing.seller?._id === user.id || listing.seller?._id?.toString() === user.id) {
+                  setError('You cannot order your own listing.');
+                  return;
+                }
+                setShowOrderForm(true);
+                setOrderForm({ quantity: '', shippingAddress: '' });
+              }}
+              className="flex w-full items-center justify-center rounded-md bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700"
+            >
+              Create order
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleCreateOrder} className="space-y-3">
+            <div className="space-y-1.5">
+              <label htmlFor="quantity" className="text-xs font-medium text-slate-700">
+                Quantity (max: {listing.quantity} {listing.unit})
+              </label>
+              <input
+                id="quantity"
+                name="quantity"
+                type="number"
+                min="0.01"
+                max={listing.quantity}
+                step="0.01"
+                required
+                value={orderForm.quantity}
+                onChange={handleOrderFormChange}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs outline-none ring-emerald-500 focus:ring-1"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="shippingAddress" className="text-xs font-medium text-slate-700">
+                Shipping Address (optional)
+              </label>
+              <textarea
+                id="shippingAddress"
+                name="shippingAddress"
+                rows={3}
+                value={orderForm.shippingAddress}
+                onChange={handleOrderFormChange}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs outline-none ring-emerald-500 focus:ring-1"
+                placeholder="Leave empty to use your profile address"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOrderForm(false);
+                  setError('');
+                }}
+                className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={creatingOrder}
+                className="flex-1 rounded-md bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {creatingOrder ? 'Creating...' : 'Create Order'}
+              </button>
+            </div>
+          </form>
+        )}
       </aside>
     </div>
   );

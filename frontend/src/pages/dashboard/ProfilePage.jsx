@@ -2,19 +2,12 @@ import { useEffect, useState } from 'react';
 import apiClient from '../../lib/apiClient';
 import { useAuth } from '../../auth/AuthContext';
 
-const roles = [
-  { value: 'buyer', label: 'Buyer' },
-  { value: 'seller', label: 'Seller' },
-  { value: 'both', label: 'Both' },
-];
-
 function ProfilePage() {
   const { user, setUser } = useAuth();
   const [form, setForm] = useState({
     name: '',
     email: '',
     phone: '',
-    role: 'both',
     address: '',
     profilePicture: '',
   });
@@ -39,7 +32,6 @@ function ProfilePage() {
           name: u.name || '',
           email: u.email || '',
           phone: u.phone || '',
-          role: u.role || 'both',
           address: u.address || '',
           profilePicture: u.profilePicture || '',
         });
@@ -73,7 +65,6 @@ function ProfilePage() {
       const res = await apiClient.put('/users/profile', {
         name: form.name,
         phone: form.phone,
-        role: form.role,
         address: form.address,
         profilePicture: form.profilePicture,
       });
@@ -113,7 +104,7 @@ function ProfilePage() {
       <header>
         <h1 className="text-xl font-semibold text-slate-900">Profile</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Manage your account details, roles, and security settings.
+          Manage your account details and security settings.
         </p>
       </header>
       <div className="grid gap-6 md:grid-cols-[minmax(0,1.6fr),minmax(0,1fr)]">
@@ -151,37 +142,17 @@ function ProfilePage() {
               />
             </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1.5">
-              <label htmlFor="phone" className="text-xs font-medium text-slate-700">
-                Phone
-              </label>
-              <input
-                id="phone"
-                name="phone"
-                value={form.phone}
-                onChange={handleProfileChange}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor="role" className="text-xs font-medium text-slate-700">
-                Role
-              </label>
-              <select
-                id="role"
-                name="role"
-                value={form.role}
-                onChange={handleProfileChange}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
-              >
-                {roles.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="space-y-1.5">
+            <label htmlFor="phone" className="text-xs font-medium text-slate-700">
+              Phone
+            </label>
+            <input
+              id="phone"
+              name="phone"
+              value={form.phone}
+              onChange={handleProfileChange}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
+            />
           </div>
           <div className="space-y-1.5">
             <label htmlFor="address" className="text-xs font-medium text-slate-700">

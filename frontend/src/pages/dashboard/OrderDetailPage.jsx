@@ -1,14 +1,35 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import apiClient from '../../lib/apiClient';
+import { useAuth } from '../../auth/AuthContext';
 
-const nextStatusesByRole = {
-  buyer: ['delivered', 'cancelled'],
-  seller: ['confirmed', 'shipped', 'cancelled'],
+// Status transitions based on buyer/seller relationship
+const statusTransitions = {
+  pending: {
+    buyer: ['cancelled'],
+    seller: ['confirmed', 'cancelled'],
+  },
+  confirmed: {
+    buyer: ['cancelled'],
+    seller: ['shipped', 'cancelled'],
+  },
+  shipped: {
+    buyer: ['delivered'],
+    seller: [],
+  },
+  delivered: {
+    buyer: [],
+    seller: [],
+  },
+  cancelled: {
+    buyer: [],
+    seller: [],
+  },
 };
 
 function OrderDetailPage() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -48,13 +69,25 @@ function OrderDetailPage() {
     return <div className="text-sm text-slate-600">Loading order...</div>;
   }
 
-  if (!order) {
+  if (!order || !user) {
     return <div className="text-sm text-red-600">{error || 'Order not found.'}</div>;
   }
 
-  const allowedStatuses = new Set(
-    [...(nextStatusesByRole.buyer || []), ...(nextStatusesByRole.seller || [])],
-  );
+  // Determine if current user is buyer or seller
+  const isBuyer = order.buyer?._id === user.id || order.buyer?._id?.toString() === user.id;
+  const isSeller = order.seller?._id === user.id || order.seller?._id?.toString() === user.id;
+  const currentStatus = order.status;
+  
+  // Get allowed status transitions based on current status and user's role in this order
+  const allowedStatuses = [];
+  if (isBuyer && statusTransitions[currentStatus]?.buyer) {
+    allowedStatuses.push(...statusTransitions[currentStatus].buyer);
+  }
+  if (isSeller && statusTransitions[currentStatus]?.seller) {
+    allowedStatuses.push(...statusTransitions[currentStatus].seller);
+  }
+  
+  const uniqueAllowedStatuses = [...new Set(allowedStatuses)];
 
   return (
     <div className="space-y-4">
@@ -101,21 +134,27 @@ function OrderDetailPage() {
           <div>
             <h2 className="text-sm font-semibold text-slate-900">Update status</h2>
             <p className="mt-1 text-xs text-slate-600">
-              Allowed transitions depend on whether you are the buyer or seller.
+              Current status: <span className="font-medium capitalize">{currentStatus}</span>
+              {isBuyer && <span className="ml-2 text-slate-500">(You are the buyer)</span>}
+              {isSeller && <span className="ml-2 text-slate-500">(You are the seller)</span>}
             </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {[...allowedStatuses].map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  disabled={updating}
-                  onClick={() => updateStatus(s)}
-                  className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-60"
-                >
-                  Set {s}
-                </button>
-              ))}
-            </div>
+            {uniqueAllowedStatuses.length === 0 ? (
+              <p className="mt-2 text-xs text-slate-500">No status changes available.</p>
+            ) : (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {uniqueAllowedStatuses.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    disabled={updating}
+                    onClick={() => updateStatus(s)}
+                    className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-60"
+                  >
+                    Set {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </aside>
       </div>

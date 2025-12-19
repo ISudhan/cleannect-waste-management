@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import apiClient from '../../lib/apiClient';
 
 function MessagesPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Handle navigation from listing detail page
+  useEffect(() => {
+    if (location.state?.receiverId) {
+      navigate(`/dashboard/messages/${location.state.receiverId}`, { replace: true });
+    }
+  }, [location.state, navigate]);
 
   useEffect(() => {
     let cancelled = false;

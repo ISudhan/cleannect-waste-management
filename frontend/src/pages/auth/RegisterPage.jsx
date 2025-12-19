@@ -2,12 +2,6 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 
-const roles = [
-  { value: 'buyer', label: 'Buyer' },
-  { value: 'seller', label: 'Seller' },
-  { value: 'both', label: 'Both' },
-];
-
 function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -16,7 +10,6 @@ function RegisterPage() {
     email: '',
     password: '',
     phone: '',
-    role: 'both',
     address: '',
   });
   const [submitting, setSubmitting] = useState(false);
@@ -102,38 +95,18 @@ function RegisterPage() {
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
           />
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5 text-sm">
-            <label htmlFor="phone" className="font-medium text-slate-800">
-              Phone
-            </label>
-            <input
-              id="phone"
-              name="phone"
-              required
-              value={form.phone}
-              onChange={handleChange}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
-            />
-          </div>
-          <div className="space-y-1.5 text-sm">
-            <label htmlFor="role" className="font-medium text-slate-800">
-              Role
-            </label>
-            <select
-              id="role"
-              name="role"
-              value={form.role}
-              onChange={handleChange}
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
-            >
-              {roles.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="space-y-1.5 text-sm">
+          <label htmlFor="phone" className="font-medium text-slate-800">
+            Phone
+          </label>
+          <input
+            id="phone"
+            name="phone"
+            required
+            value={form.phone}
+            onChange={handleChange}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
+          />
         </div>
         <div className="space-y-1.5 text-sm">
           <label htmlFor="address" className="font-medium text-slate-800">

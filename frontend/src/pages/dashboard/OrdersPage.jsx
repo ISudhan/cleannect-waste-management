@@ -4,7 +4,7 @@ import apiClient from '../../lib/apiClient';
 
 const statusOptions = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
 const roleOptions = [
-  { value: '', label: 'Buyer & seller' },
+  { value: '', label: 'All orders' },
   { value: 'buyer', label: 'As buyer' },
   { value: 'seller', label: 'As seller' },
 ];
@@ -76,7 +76,7 @@ function OrdersPage() {
           </select>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="font-medium text-slate-700">Role</span>
+          <span className="font-medium text-slate-700">Filter by</span>
           <select
             value={role}
             onChange={(e) => setRole(e.target.value)}
