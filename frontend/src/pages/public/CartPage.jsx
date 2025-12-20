@@ -44,10 +44,7 @@ function CartPage() {
   }
 
   const handleQuantityChange = async (itemId, newQuantity) => {
-    if (newQuantity <= 0) {
-      handleRemoveItem(itemId);
-      return;
-    }
+
 
     setUpdatingItems((prev) => new Set(prev).add(itemId));
     try {
