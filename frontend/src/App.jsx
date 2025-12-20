@@ -3,6 +3,8 @@ import PublicLayout from './layouts/PublicLayout';
 import DashboardLayout from './layouts/DashboardLayout';
 import LandingPage from './pages/public/LandingPage';
 import ListingDetailPage from './pages/public/ListingDetailPage';
+import CartPage from './pages/public/CartPage';
+import CheckoutPage from './pages/public/CheckoutPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import DashboardHomePage from './pages/dashboard/DashboardHomePage';
@@ -24,6 +26,8 @@ function App() {
           <Route element={<PublicLayout />}>
             <Route path="/" element={<LandingPage />} />
             <Route path="/listing/:id" element={<ListingDetailPage />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/auth/login" element={<LoginPage />} />
             <Route path="/auth/register" element={<RegisterPage />} />
           </Route>
