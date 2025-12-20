@@ -50,7 +50,7 @@ function LandingPage() {
               Get started
             </Link>
             <Link
-              to="/auth/login"
+              to="/dashboard"
               className="rounded-md border border-slate-300 px-4 py-2 font-medium text-slate-800 hover:bg-slate-100"
             >
               Go to dashboard
