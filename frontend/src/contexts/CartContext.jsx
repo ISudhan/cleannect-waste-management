@@ -123,7 +123,7 @@ export function CartProvider({ children }) {
 
   const getCartCount = () => {
     if (!cart || !cart.items) return 0;
-    return cart.items.reduce((total, item) => total + item.quantity, 0);
+    return cart.items.length;
   };
 
   const value = {
