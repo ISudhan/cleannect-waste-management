@@ -16,6 +16,7 @@ const listingRoutes = require('./routes/listings');
 const orderRoutes = require('./routes/orders');
 const paymentRoutes = require('./routes/payments');
 const messageRoutes = require('./routes/messages');
+const cartRoutes = require('./routes/carts');
 
 // Import error handler
 const errorHandler = require('./middleware/errorHandler');
@@ -122,6 +123,7 @@ app.use('/api/listings', listingRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/carts', cartRoutes);
 
 // 404 handler
 app.use((req, res) => {
