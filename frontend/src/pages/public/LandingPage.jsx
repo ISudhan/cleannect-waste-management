@@ -42,20 +42,6 @@ function LandingPage() {
             Cleannect helps you list, discover, and trade recyclable materials with verified
             partners. Manage your listings, orders, and communication from a single dashboard.
           </p>
-          <div className="mt-5 flex flex-wrap gap-3 text-sm">
-            <Link
-              to="/auth/register"
-              className="rounded-md bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700"
-            >
-              Get started
-            </Link>
-            <Link
-              to="/dashboard"
-              className="rounded-md border border-slate-300 px-4 py-2 font-medium text-slate-800 hover:bg-slate-100"
-            >
-              Go to dashboard
-            </Link>
-          </div>
         </div>
         <div className="rounded-xl border bg-white p-4 text-xs text-slate-600 shadow-sm">
           <p className="mb-2 font-semibold text-slate-900">Live marketplace snapshot</p>
