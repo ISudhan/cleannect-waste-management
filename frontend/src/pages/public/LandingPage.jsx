@@ -20,6 +20,21 @@ const sortOptions = [
   { value: 'price', label: 'Price: High to Low', order: 'desc' },
 ];
 
+// Map categories to fallback images
+const getCategoryFallbackImage = (category) => {
+  const categoryImages = {
+    plastic: '/plastic.webp',
+    paper: '/paper.webp',
+    metal: '/metal.webp',
+    organic: '/organic.webp',
+    electronic: '/electronic.webp',
+    textile: '/textile.webp',
+    // Default fallback for glass, other, or unknown categories
+    default: '/plastic.webp',
+  };
+  return categoryImages[category?.toLowerCase()] || categoryImages.default;
+};
+
 function LandingPage() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -356,29 +371,15 @@ function LandingPage() {
                   >
                     {/* Product Image */}
                     <div className="relative aspect-square w-full overflow-hidden bg-slate-100">
-                      {mainImage ? (
-                        <img
-                          src={mainImage}
-                          alt={listing.title}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center bg-slate-100">
-                          <svg
-                            className="h-12 w-12 text-slate-400"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
-                          </svg>
-                        </div>
-                      )}
+                      <img
+                        src={mainImage || getCategoryFallbackImage(listing.category)}
+                        alt={listing.title}
+                        className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
+                        onError={(e) => {
+                          // Fallback to category image if the main image fails to load
+                          e.target.src = getCategoryFallbackImage(listing.category);
+                        }}
+                      />
                       {/* Status Badge */}
                       {listing.status && (
                         <div className="absolute top-2 right-2">

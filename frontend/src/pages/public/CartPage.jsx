@@ -3,6 +3,21 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../auth/AuthContext';
 
+// Map categories to fallback images
+const getCategoryFallbackImage = (category) => {
+  const categoryImages = {
+    plastic: '/plastic.webp',
+    paper: '/paper.webp',
+    metal: '/metal.webp',
+    organic: '/organic.webp',
+    electronic: '/electronic.webp',
+    textile: '/textile.webp',
+    // Default fallback for glass, other, or unknown categories
+    default: '/plastic.webp',
+  };
+  return categoryImages[category?.toLowerCase()] || categoryImages.default;
+};
+
 function CartPage() {
   const { cart, updateQuantity, removeFromCart, loading } = useCart();
   const { user } = useAuth();
@@ -113,17 +128,17 @@ function CartPage() {
                     to={`/listing/${listing._id}`}
                     className="flex-shrink-0"
                   >
-                    {listing.images && listing.images.length > 0 ? (
+                    <div className="h-24 w-24 rounded-md bg-slate-100 overflow-hidden">
                       <img
-                        src={listing.images[0]}
+                        src={listing.images && listing.images.length > 0 ? listing.images[0] : getCategoryFallbackImage(listing.category)}
                         alt={listing.title}
-                        className="h-24 w-24 rounded-md object-cover"
+                        className="h-full w-full object-contain"
+                        onError={(e) => {
+                          // Fallback to category image if the image fails to load
+                          e.target.src = getCategoryFallbackImage(listing.category);
+                        }}
                       />
-                    ) : (
-                      <div className="h-24 w-24 rounded-md bg-slate-100 flex items-center justify-center">
-                        <span className="text-xs text-slate-400">No image</span>
-                      </div>
-                    )}
+                    </div>
                   </Link>
 
                   {/* Details */}

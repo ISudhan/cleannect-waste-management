@@ -4,6 +4,21 @@ import apiClient from '../../lib/apiClient';
 import { useAuth } from '../../auth/AuthContext';
 import { useCart } from '../../contexts/CartContext';
 
+// Map categories to fallback images
+const getCategoryFallbackImage = (category) => {
+  const categoryImages = {
+    plastic: '/plastic.webp',
+    paper: '/paper.webp',
+    metal: '/metal.webp',
+    organic: '/organic.webp',
+    electronic: '/electronic.webp',
+    textile: '/textile.webp',
+    // Default fallback for glass, other, or unknown categories
+    default: '/plastic.webp',
+  };
+  return categoryImages[category?.toLowerCase()] || categoryImages.default;
+};
+
 function ListingDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -130,19 +145,17 @@ function ListingDetailPage() {
       <div className="grid gap-8 md:grid-cols-2">
         {/* Image Gallery */}
         <div className="space-y-4">
-          {mainImage ? (
-            <div className="aspect-square w-full overflow-hidden rounded-lg border bg-white shadow-sm">
-              <img
-                src={mainImage}
-                alt={listing.title}
-                className="h-full w-full object-cover"
-              />
-            </div>
-          ) : (
-            <div className="aspect-square w-full rounded-lg border bg-slate-100 flex items-center justify-center">
-              <span className="text-slate-400 text-sm">No image available</span>
-            </div>
-          )}
+          <div className="aspect-square w-full overflow-hidden rounded-lg border bg-white shadow-sm">
+            <img
+              src={mainImage || getCategoryFallbackImage(listing.category)}
+              alt={listing.title}
+              className="h-full w-full object-contain"
+              onError={(e) => {
+                // Fallback to category image if the main image fails to load
+                e.target.src = getCategoryFallbackImage(listing.category);
+              }}
+            />
+          </div>
           {images.length > 1 && (
             <div className="grid grid-cols-4 gap-2">
               {images.map((img, index) => (
@@ -159,7 +172,11 @@ function ListingDetailPage() {
                   <img
                     src={img}
                     alt={`${listing.title} ${index + 1}`}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
+                    onError={(e) => {
+                      // Fallback to category image if the thumbnail image fails to load
+                      e.target.src = getCategoryFallbackImage(listing.category);
+                    }}
                   />
                 </button>
               ))}
