@@ -144,19 +144,24 @@ function ListingDetailPage() {
   // - If quantity is 0 or backend status is not "available" -> "Unavailable"
   // - Else if we have initialQuantity and remaining quantity is <= half of the original quantity -> "Selling fast"
   // - Else -> "Available"
-  const remainingQuantity = listing.quantity != null ? parseFloat(listing.quantity) : 0;
-  const initialQuantity = listing.initialQuantity != null ? parseFloat(listing.initialQuantity) : null;
+  const toNumber = (val) => {
+    const num = Number(val);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  const remainingQuantity = toNumber(listing.quantity) ?? 0;
+  const initialQuantity = toNumber(listing.initialQuantity);
   const listingStatus = listing.status || 'available';
   
   // Check if unavailable: quantity is 0 or less, or status is not 'available'
   const isUnavailable = isNaN(remainingQuantity) || remainingQuantity <= 0 || listingStatus !== 'available';
   
-  // Check if selling fast: only if we have initialQuantity and remaining is > 0 and <= half of initial
-  const isSellingFast = 
-    !isUnavailable && 
-    initialQuantity != null && 
-    !isNaN(initialQuantity) && 
-    initialQuantity > 0 && 
+  // Show "Selling fast" when we have an initialQuantity baseline
+  // and remaining is at or below half of that baseline.
+  const isSellingFast =
+    !isUnavailable &&
+    initialQuantity !== null &&
+    initialQuantity > 0 &&
     remainingQuantity > 0 &&
     remainingQuantity <= initialQuantity / 2;
 

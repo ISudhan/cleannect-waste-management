@@ -51,7 +51,7 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    // Atomically decrement available quantity to avoid race conditions.
+    // Atomically decrement available quantity to hold stock for this order
     const updatedListing = await Listing.findOneAndUpdate(
       { _id: listingId, status: 'available', quantity: { $gte: requestedQuantity } },
       { $inc: { quantity: -requestedQuantity } },
@@ -65,14 +65,20 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    // Mark as sold if stock reaches zero.
-    if (updatedListing.quantity <= 0 && updatedListing.status !== 'sold') {
-      updatedListing.status = 'sold';
-      updatedListing.quantity = 0; // Ensure quantity is exactly 0
+    // Backfill initialQuantity for legacy listings so "selling fast" can be computed
+    if (!updatedListing.initialQuantity) {
+      updatedListing.initialQuantity = updatedListing.quantity + requestedQuantity;
       await updatedListing.save();
     }
 
-    // Calculate total price using the up-to-date listing
+    // If stock is now zero, mark listing as sold so it disappears from live listing
+    if (updatedListing.quantity <= 0 && updatedListing.status !== 'sold') {
+      updatedListing.status = 'sold';
+      updatedListing.quantity = 0;
+      await updatedListing.save();
+    }
+
+    // Calculate total price using the updated listing price
     const totalPrice = updatedListing.price * requestedQuantity;
 
     // Create order
@@ -283,6 +289,28 @@ exports.updateOrderStatus = async (req, res) => {
     // Update order status
     order.status = status;
     await order.save();
+
+    const listing = await Listing.findById(order.listing._id || order.listing);
+
+    // If confirming: remove from live listing (mark sold)
+    if (status === 'confirmed') {
+      if (listing) {
+        listing.status = 'sold';
+        listing.quantity = Math.max(listing.quantity, 0);
+        await listing.save();
+      }
+    }
+
+    // If cancelling: restore the reserved quantity and make available
+    if (status === 'cancelled') {
+      if (listing) {
+        listing.quantity += order.quantity;
+        if (listing.quantity > 0) {
+          listing.status = 'available';
+        }
+        await listing.save();
+      }
+    }
 
     await order.populate([
       { path: 'listing', select: 'title description category images' },

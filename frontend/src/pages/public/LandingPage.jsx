@@ -18,6 +18,7 @@ const sortOptions = [
   { value: 'createdAt', label: 'Oldest First', order: 'asc' },
   { value: 'price', label: 'Price: Low to High', order: 'asc' },
   { value: 'price', label: 'Price: High to Low', order: 'desc' },
+  { value: 'listingStatus', label: 'Listing Status', order: 'asc' },
 ];
 
 // Map categories to fallback images
@@ -33,6 +34,35 @@ const getCategoryFallbackImage = (category) => {
     default: '/plastic.webp',
   };
   return categoryImages[category?.toLowerCase()] || categoryImages.default;
+};
+
+// Derive status for badge display using quantity and initialQuantity
+const deriveListingStatus = (listing) => {
+  const toNumber = (val) => {
+    const num = Number(val);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  const remainingQuantity = toNumber(listing?.quantity) ?? 0;
+  const initialQuantity = toNumber(listing?.initialQuantity);
+  const backendStatus = listing?.status || 'available';
+
+  const isUnavailable = remainingQuantity <= 0 || backendStatus !== 'available';
+
+  const isSellingFast =
+    !isUnavailable &&
+    initialQuantity !== null &&
+    initialQuantity > 0 &&
+    remainingQuantity > 0 &&
+    remainingQuantity <= initialQuantity / 2;
+
+  if (isUnavailable) {
+    return { label: 'Unavailable', classes: 'bg-slate-100 text-slate-700' };
+  }
+  if (isSellingFast) {
+    return { label: 'Selling fast', classes: 'bg-amber-50 text-amber-700' };
+  }
+  return { label: 'Available', classes: 'bg-green-50 text-green-700' };
 };
 
 function LandingPage() {
@@ -86,7 +116,26 @@ function LandingPage() {
 
         const res = await apiClient.get('/listings', { params });
         if (!cancelled) {
-          setListings(res.data?.data?.listings ?? []);
+          let incoming = res.data?.data?.listings ?? [];
+
+          // Apply client-side sort for derived listingStatus
+          if (sortBy === 'listingStatus') {
+            const statusPriority = {
+              'Available': 2,
+              'Selling fast': 1,
+              'Unavailable': 0,
+            };
+            incoming = [...incoming].sort((a, b) => {
+              const { label: labelA } = deriveListingStatus(a);
+              const { label: labelB } = deriveListingStatus(b);
+              const pa = statusPriority[labelA] ?? -1;
+              const pb = statusPriority[labelB] ?? -1;
+              if (pa === pb) return 0;
+              return sortOrder === 'desc' ? pb - pa : pa - pb;
+            });
+          }
+
+          setListings(incoming);
         }
       } catch (err) {
         if (!cancelled) {
@@ -381,21 +430,16 @@ function LandingPage() {
                         }}
                       />
                       {/* Status Badge */}
-                      {listing.status && (
-                        <div className="absolute top-2 right-2">
-                          <span
-                            className={`rounded-full px-2 py-1 text-xs font-medium ${
-                              listing.status === 'available'
-                                ? 'bg-green-100 text-green-700'
-                                : listing.status === 'sold'
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-slate-100 text-slate-700'
-                            }`}
-                          >
-                            {listing.status === 'available' ? 'Available' : listing.status}
-                          </span>
-                        </div>
-                      )}
+                      {(() => {
+                        const { label, classes } = deriveListingStatus(listing);
+                        return (
+                          <div className="absolute top-2 right-2">
+                            <span className={`rounded-full px-2 py-1 text-xs font-medium ${classes}`}>
+                              {label}
+                            </span>
+                          </div>
+                        );
+                      })()}
                       {/* Category Badge */}
                       {listing.category && (
                         <div className="absolute top-2 left-2">
