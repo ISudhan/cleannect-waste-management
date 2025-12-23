@@ -140,6 +140,33 @@ function ListingDetailPage() {
   const images = listing.images && listing.images.length > 0 ? listing.images : [];
   const mainImage = images[selectedImageIndex] || (images.length > 0 ? images[0] : null);
 
+  // Derive status for UI:
+  // - If quantity is 0 or backend status is not "available" -> "Unavailable"
+  // - Else if we have initialQuantity and remaining quantity is <= half of the original quantity -> "Selling fast"
+  // - Else -> "Available"
+  const remainingQuantity = listing.quantity != null ? parseFloat(listing.quantity) : 0;
+  const initialQuantity = listing.initialQuantity != null ? parseFloat(listing.initialQuantity) : null;
+  const listingStatus = listing.status || 'available';
+  
+  // Check if unavailable: quantity is 0 or less, or status is not 'available'
+  const isUnavailable = isNaN(remainingQuantity) || remainingQuantity <= 0 || listingStatus !== 'available';
+  
+  // Check if selling fast: only if we have initialQuantity and remaining is > 0 and <= half of initial
+  const isSellingFast = 
+    !isUnavailable && 
+    initialQuantity != null && 
+    !isNaN(initialQuantity) && 
+    initialQuantity > 0 && 
+    remainingQuantity > 0 &&
+    remainingQuantity <= initialQuantity / 2;
+
+  const statusLabel = isUnavailable ? 'Unavailable' : isSellingFast ? 'Selling fast' : 'Available';
+  const statusClasses = isUnavailable
+    ? 'bg-slate-100 text-slate-700'
+    : isSellingFast
+      ? 'bg-amber-50 text-amber-700'
+      : 'bg-green-50 text-green-700';
+
   return (
     <div className="space-y-6">
       <div className="grid gap-8 md:grid-cols-2">
@@ -191,15 +218,9 @@ function ListingDetailPage() {
               <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
                 {listing.category}
               </span>
-              {listing.status === 'available' ? (
-                <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
-                  Available
-                </span>
-              ) : (
-                <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700">
-                  {listing.status}
-                </span>
-              )}
+              <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusClasses}`}>
+                {statusLabel}
+              </span>
             </div>
             <h1 className="text-3xl font-bold text-slate-900">{listing.title}</h1>
             <p className="mt-3 text-base text-slate-600">{listing.description}</p>

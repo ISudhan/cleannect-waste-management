@@ -17,6 +17,15 @@ exports.createOrder = async (req, res) => {
 
     const { listingId, quantity, shippingAddress } = req.body;
 
+    // Normalize and validate requested quantity
+    const requestedQuantity = parseFloat(quantity);
+    if (isNaN(requestedQuantity) || requestedQuantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid quantity greater than 0',
+      });
+    }
+
     // Get listing
     const listing = await Listing.findById(listingId);
     if (!listing) {
@@ -42,23 +51,36 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    // Check if quantity is available
-    if (quantity > listing.quantity) {
+    // Atomically decrement available quantity to avoid race conditions.
+    const updatedListing = await Listing.findOneAndUpdate(
+      { _id: listingId, status: 'available', quantity: { $gte: requestedQuantity } },
+      { $inc: { quantity: -requestedQuantity } },
+      { new: true }
+    );
+
+    if (!updatedListing) {
       return res.status(400).json({
         success: false,
-        message: 'Requested quantity exceeds available quantity',
+        message: 'Requested quantity exceeds available stock',
       });
     }
 
-    // Calculate total price
-    const totalPrice = listing.price * quantity;
+    // Mark as sold if stock reaches zero.
+    if (updatedListing.quantity <= 0 && updatedListing.status !== 'sold') {
+      updatedListing.status = 'sold';
+      updatedListing.quantity = 0; // Ensure quantity is exactly 0
+      await updatedListing.save();
+    }
+
+    // Calculate total price using the up-to-date listing
+    const totalPrice = updatedListing.price * requestedQuantity;
 
     // Create order
     const order = await Order.create({
       listing: listingId,
       buyer: req.user.id,
-      seller: listing.seller,
-      quantity,
+      seller: updatedListing.seller,
+      quantity: requestedQuantity,
       totalPrice,
       shippingAddress: shippingAddress || req.user.address,
     });
@@ -261,18 +283,6 @@ exports.updateOrderStatus = async (req, res) => {
     // Update order status
     order.status = status;
     await order.save();
-
-    // If order is confirmed or delivered, update listing quantity
-    if (status === 'confirmed') {
-      const listing = await Listing.findById(order.listing);
-      if (listing) {
-        listing.quantity -= order.quantity;
-        if (listing.quantity <= 0) {
-          listing.status = 'sold';
-        }
-        await listing.save();
-      }
-    }
 
     await order.populate([
       { path: 'listing', select: 'title description category images' },

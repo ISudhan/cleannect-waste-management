@@ -18,7 +18,10 @@ router.post(
   protect,
   [
     body('listingId').notEmpty().withMessage('Listing ID is required').isMongoId().withMessage('Invalid listing ID'),
-    body('quantity').isFloat({ min: 0.01 }).withMessage('Quantity must be greater than 0'),
+    body('quantity')
+      .toFloat()
+      .isFloat({ min: 0.01 })
+      .withMessage('Quantity must be greater than 0'),
     body('shippingAddress').optional().isObject().withMessage('Shipping address must be an object'),
   ],
   validate,

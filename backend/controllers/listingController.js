@@ -136,6 +136,12 @@ exports.createListing = async (req, res) => {
       seller: req.user.id,
     };
 
+    // Ensure initialQuantity is set for new listings so we can compare
+    // how much stock has been sold over time for UI purposes.
+    if (listingData.quantity && !listingData.initialQuantity) {
+      listingData.initialQuantity = listingData.quantity;
+    }
+
     // Handle images from upload
     if (req.files && req.files.length > 0) {
       listingData.images = req.files.map((file) => file.path || file.url);
@@ -187,6 +193,20 @@ exports.updateListing = async (req, res) => {
     }
 
     const updateData = { ...req.body };
+
+    // If this listing was created before initialQuantity was introduced and
+    // the seller is now updating the quantity, backfill initialQuantity so
+    // future "selling fast" calculations have a baseline.
+    if (!listing.initialQuantity && typeof updateData.quantity === 'number') {
+      updateData.initialQuantity = listing.quantity;
+    }
+
+    // If the seller sets quantity to 0 (or below), automatically mark the listing
+    // as sold so it is treated as unavailable in the UI and queries.
+    if (typeof updateData.quantity === 'number' && updateData.quantity <= 0) {
+      updateData.quantity = 0;
+      updateData.status = 'sold';
+    }
 
     // Handle new images
     if (req.files && req.files.length > 0) {
