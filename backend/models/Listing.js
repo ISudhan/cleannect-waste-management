@@ -31,7 +31,24 @@ const listingSchema = new mongoose.Schema(
     quantity: {
       type: Number,
       required: [true, 'Please provide quantity'],
-      min: [0.01, 'Quantity must be greater than 0'],
+      min: [0, 'Quantity must be greater than or equal to 0'],
+      validate: {
+        validator: function(value) {
+          // Allow 0 quantity only when status is 'sold' or 'archived'
+          if (value === 0) {
+            return this.status === 'sold' || this.status === 'archived';
+          }
+          // Otherwise, quantity must be > 0
+          return value > 0;
+        },
+        message: 'Quantity must be greater than 0 for available listings'
+      }
+    },
+    // Tracks the original quantity when the listing was created.
+    // Used for derived UI statuses like "selling fast".
+    initialQuantity: {
+      type: Number,
+      min: [0.01, 'Initial quantity must be greater than 0'],
     },
     unit: {
       type: String,
