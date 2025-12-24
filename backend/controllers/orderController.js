@@ -292,11 +292,15 @@ exports.updateOrderStatus = async (req, res) => {
 
     const listing = await Listing.findById(order.listing._id || order.listing);
 
-    // If confirming: remove from live listing (mark sold)
+    // If confirming: only mark as sold if quantity reaches 0, otherwise keep as available
     if (status === 'confirmed') {
       if (listing) {
-        listing.status = 'sold';
-        listing.quantity = Math.max(listing.quantity, 0);
+        // Only mark as sold if quantity is 0 or less
+        if (listing.quantity <= 0) {
+          listing.status = 'sold';
+          listing.quantity = 0;
+        }
+        // If there's still quantity, keep status as 'available'
         await listing.save();
       }
     }
