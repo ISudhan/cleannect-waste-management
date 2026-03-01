@@ -7,6 +7,7 @@ import CartPage from './pages/public/CartPage';
 import CheckoutPage from './pages/public/CheckoutPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import OAuthCallbackPage from './pages/auth/OAuthCallbackPage';
 import DashboardHomePage from './pages/dashboard/DashboardHomePage';
 import ProfilePage from './pages/dashboard/ProfilePage';
 import MyListingsPage from './pages/dashboard/MyListingsPage';
@@ -34,6 +35,7 @@ function App() {
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/auth/register" element={<RegisterPage />} />
+          <Route path="/auth/callback" element={<OAuthCallbackPage />} />
         </Route>
 
         {/* Dashboard layout (protected) */}
