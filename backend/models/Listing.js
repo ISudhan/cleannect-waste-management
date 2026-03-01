@@ -82,6 +82,8 @@ const listingSchema = new mongoose.Schema(
       state: { type: String, trim: true },
       zipCode: { type: String, trim: true },
       country: { type: String, trim: true, default: 'India' },
+      lat: { type: Number },
+      lng: { type: Number },
     },
   },
   {
