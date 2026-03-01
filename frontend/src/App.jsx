@@ -16,50 +16,56 @@ import OrderDetailPage from './pages/dashboard/OrderDetailPage';
 import MessagesPage from './pages/dashboard/MessagesPage';
 import ChatPage from './pages/dashboard/ChatPage';
 import PaymentPage from './pages/dashboard/PaymentPage';
+import OffersPage from './pages/dashboard/OffersPage';
+import NotificationsPage from './pages/dashboard/NotificationsPage';
+import AnalyticsPage from './pages/dashboard/AnalyticsPage';
+import WishlistPage from './pages/dashboard/WishlistPage';
 import ProtectedRoute from './routes/ProtectedRoute';
 
 function App() {
   return (
-      <BrowserRouter>
-        <Routes>
-          {/* Public layout */}
-          <Route element={<PublicLayout />}>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/listing/:id" element={<ListingDetailPage />} />
-            <Route path="/cart" element={<CartPage />} />
-            <Route path="/checkout" element={<CheckoutPage />} />
-            <Route path="/auth/login" element={<LoginPage />} />
-            <Route path="/auth/register" element={<RegisterPage />} />
-          </Route>
+    <BrowserRouter>
+      <Routes>
+        {/* Public layout */}
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/listing/:id" element={<ListingDetailPage />} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/auth/login" element={<LoginPage />} />
+          <Route path="/auth/register" element={<RegisterPage />} />
+        </Route>
 
-          {/* Dashboard layout (protected) */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<DashboardHomePage />} />
-            <Route path="profile" element={<ProfilePage />} />
-            <Route path="listings" element={<MyListingsPage />} />
-            <Route path="listings/new" element={<ListingFormPage mode="create" />} />
-            <Route path="listings/:id/edit" element={<ListingFormPage mode="edit" />} />
-            <Route path="orders" element={<OrdersPage />} />
-            <Route path="orders/:id" element={<OrderDetailPage />} />
-            <Route path="messages" element={<MessagesPage />} />
-            <Route path="messages/:userId" element={<ChatPage />} />
-            <Route path="payments/:orderId" element={<PaymentPage />} />
-          </Route>
+        {/* Dashboard layout (protected) */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<DashboardHomePage />} />
+          <Route path="profile" element={<ProfilePage />} />
+          <Route path="listings" element={<MyListingsPage />} />
+          <Route path="listings/new" element={<ListingFormPage mode="create" />} />
+          <Route path="listings/:id/edit" element={<ListingFormPage mode="edit" />} />
+          <Route path="orders" element={<OrdersPage />} />
+          <Route path="orders/:id" element={<OrderDetailPage />} />
+          <Route path="messages" element={<MessagesPage />} />
+          <Route path="messages/:userId" element={<ChatPage />} />
+          <Route path="payments/:orderId" element={<PaymentPage />} />
+          <Route path="offers" element={<OffersPage />} />
+          <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="wishlist" element={<WishlistPage />} />
+        </Route>
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
 export default App;
-

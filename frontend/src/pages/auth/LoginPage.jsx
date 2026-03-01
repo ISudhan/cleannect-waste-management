@@ -8,6 +8,7 @@ function LoginPage() {
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -31,63 +32,99 @@ function LoginPage() {
   };
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Log in</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Access your Cleannect dashboard to manage listings, orders, and messages.
+    <div className="flex min-h-[70vh] items-center justify-center">
+      <div className="w-full max-w-md fade-in">
+        {/* Header */}
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 shadow-lg">
+            <span className="text-2xl font-bold text-white">C</span>
+          </div>
+          <h1 className="text-3xl font-bold text-slate-900">Welcome back</h1>
+          <p className="mt-2 text-sm text-slate-500">Sign in to your Cleannect account</p>
+        </div>
+
+        {/* Card */}
+        <div className="card p-8">
+          {error && (
+            <div className="mb-5 flex items-start gap-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              <span className="text-base">⚠️</span>
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="block text-sm font-semibold text-slate-700">
+                Email address
+              </label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="input-field"
+                placeholder="you@example.com"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="block text-sm font-semibold text-slate-700">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPw ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="input-field pr-12"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-medium"
+                >
+                  {showPw ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn-primary w-full py-3 text-base"
+            >
+              {submitting ? (
+                <>
+                  <span className="inline-block h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  Signing in…
+                </>
+              ) : (
+                'Sign in'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center text-sm text-slate-500">
+            Don't have an account?{' '}
+            <Link to="/auth/register" className="font-semibold text-emerald-600 hover:text-emerald-700 hover:underline">
+              Create one free
+            </Link>
+          </div>
+        </div>
+
+        {/* Back link */}
+        <p className="mt-4 text-center text-sm text-slate-400">
+          <Link to="/" className="hover:text-slate-600">← Back to marketplace</Link>
         </p>
       </div>
-      <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border bg-white p-5 shadow-sm">
-        {error && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-            {error}
-          </div>
-        )}
-        <div className="space-y-1.5 text-sm">
-          <label htmlFor="email" className="font-medium text-slate-800">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
-          />
-        </div>
-        <div className="space-y-1.5 text-sm">
-          <label htmlFor="password" className="font-medium text-slate-800">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={submitting}
-          className="flex w-full items-center justify-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-        >
-          {submitting ? 'Logging in...' : 'Log in'}
-        </button>
-      </form>
-      <p className="text-xs text-slate-600">
-        Don&apos;t have an account?{' '}
-        <Link to="/auth/register" className="font-medium text-emerald-600 hover:underline">
-          Sign up
-        </Link>
-      </p>
     </div>
   );
 }
 
 export default LoginPage;
-
-

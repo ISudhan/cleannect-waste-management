@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../../lib/apiClient';
 import { useAuth } from '../../auth/AuthContext';
 import { useCart } from '../../contexts/CartContext';
+import { useWishlist } from '../../contexts/WishlistContext';
+import ReviewsSection from '../../components/ReviewsSection';
 
 // Map categories to fallback images
 const getCategoryFallbackImage = (category) => {
@@ -24,6 +26,7 @@ function ListingDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToCart, loading: cartLoading } = useCart();
+  const { isWishlisted, toggleWishlist } = useWishlist();
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -31,6 +34,16 @@ function ListingDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [addingToCart, setAddingToCart] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  // Offer modal state
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [offerPrice, setOfferPrice] = useState('');
+  const [offerQty, setOfferQty] = useState(1);
+  const [offerMsg, setOfferMsg] = useState('');
+  const [offerLoading, setOfferLoading] = useState(false);
+  const [offerError, setOfferError] = useState('');
+  const [offerSuccess, setOfferSuccess] = useState('');
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -98,10 +111,40 @@ function ListingDetailPage() {
       navigate('/auth/login');
       return;
     }
-    navigate('/dashboard/messages', {
-      state: { receiverId: listing.seller?._id, listingId: listing._id },
+    navigate(`/dashboard/messages/${listing.seller?._id}`, {
+      state: { listingId: listing._id },
     });
   };
+
+  const handleWishlistToggle = async () => {
+    if (!user) { navigate('/auth/login'); return; }
+    setWishlistLoading(true);
+    try { await toggleWishlist(listing._id); } catch { /* ignore */ }
+    finally { setWishlistLoading(false); }
+  };
+
+  const handleMakeOffer = async (e) => {
+    e.preventDefault();
+    if (!user) { navigate('/auth/login'); return; }
+    setOfferLoading(true);
+    setOfferError('');
+    setOfferSuccess('');
+    try {
+      await apiClient.post('/offers', {
+        listingId: listing._id,
+        offerPrice: parseFloat(offerPrice),
+        quantity: parseFloat(offerQty),
+        message: offerMsg || undefined,
+      });
+      setOfferSuccess('Offer sent! The seller will be notified.');
+      setTimeout(() => setShowOfferModal(false), 2000);
+    } catch (err) {
+      setOfferError(err.response?.data?.message || 'Failed to send offer');
+    } finally {
+      setOfferLoading(false);
+    }
+  };
+
 
   if (loading) {
     return <div className="text-sm text-slate-600">Loading listing...</div>;
@@ -315,6 +358,16 @@ function ListingDetailPage() {
                   >
                     {addingToCart ? 'Adding to Cart...' : 'Add to Cart'}
                   </button>
+                  {/* Make an Offer button — only for non-sellers */}
+                  {user && user.id !== listing.seller?._id && (
+                    <button
+                      type="button"
+                      onClick={() => { setShowOfferModal(true); setOfferPrice(listing.price); }}
+                      className="w-full rounded-md border border-emerald-500 px-4 py-3 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+                    >
+                      Make an Offer
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleContactSeller}
@@ -345,10 +398,109 @@ function ListingDetailPage() {
                   <span className="text-slate-900">{listing.seller.phone}</span>
                 </div>
               )}
+              {listing.seller?.rating > 0 && (
+                <div>
+                  <span className="font-medium text-slate-700">Rating:</span>{' '}
+                  <span className="text-amber-500 font-medium">
+                    {'★'.repeat(Math.round(listing.seller.rating))}
+                    {'☆'.repeat(5 - Math.round(listing.seller.rating))}
+                  </span>
+                  <span className="text-slate-500 text-xs ml-1">({listing.seller.totalRatings ?? listing.seller.rating} reviews)</span>
+                </div>
+              )}
             </div>
+            {/* Wishlist button */}
+            {user && user.id !== listing.seller?._id && (
+              <button
+                onClick={handleWishlistToggle}
+                disabled={wishlistLoading}
+                className={`mt-4 flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition ${
+                  isWishlisted(listing._id)
+                    ? 'border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-100'
+                    : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {isWishlisted(listing._id) ? '♥ Saved to Wishlist' : '♡ Save to Wishlist'}
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Reviews Section */}
+      <ReviewsSection
+        sellerId={listing.seller?._id}
+        listingId={listing._id}
+      />
+
+      {/* Make an Offer Modal */}
+      {showOfferModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-900">Make an Offer</h2>
+              <button onClick={() => setShowOfferModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <form onSubmit={handleMakeOffer} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Offer Price (₹ per {listing.unit})</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={offerPrice}
+                  onChange={(e) => setOfferPrice(e.target.value)}
+                  required
+                  className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                />
+                <p className="mt-0.5 text-xs text-slate-400">Listed price: ₹{listing.price}/{listing.unit}</p>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Quantity ({listing.unit})</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  max={listing.quantity}
+                  step="0.01"
+                  value={offerQty}
+                  onChange={(e) => setOfferQty(e.target.value)}
+                  required
+                  className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Message (optional)</label>
+                <textarea
+                  value={offerMsg}
+                  onChange={(e) => setOfferMsg(e.target.value)}
+                  maxLength={500}
+                  rows={2}
+                  placeholder="Any notes for the seller…"
+                  className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                />
+              </div>
+              {offerError && <p className="text-xs text-red-500">{offerError}</p>}
+              {offerSuccess && <p className="text-xs text-green-600">{offerSuccess}</p>}
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={offerLoading}
+                  className="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {offerLoading ? 'Sending…' : 'Send Offer'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowOfferModal(false)}
+                  className="flex-1 rounded-lg border py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
