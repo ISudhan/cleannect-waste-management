@@ -17,6 +17,11 @@ const orderRoutes = require('./routes/orders');
 const paymentRoutes = require('./routes/payments');
 const messageRoutes = require('./routes/messages');
 const cartRoutes = require('./routes/carts');
+const reviewRoutes = require('./routes/reviews');
+const offerRoutes = require('./routes/offers');
+const notificationRoutes = require('./routes/notifications');
+const analyticsRoutes = require('./routes/analytics');
+const wishlistRoutes = require('./routes/wishlist');
 
 // Import error handler
 const errorHandler = require('./middleware/errorHandler');
@@ -66,12 +71,24 @@ io.on('connection', (socket) => {
     console.log(`User disconnected: ${socket.userId}`);
   });
 
-  // Handle typing indicators (optional)
+  // Handle typing indicators
   socket.on('typing', (data) => {
     socket.to(data.receiverId).emit('userTyping', {
       userId: socket.userId,
       isTyping: data.isTyping,
     });
+  });
+
+  // Join a shared conversation room (bidirectional delivery)
+  socket.on('joinConversation', (otherUserId) => {
+    const room = [socket.userId, otherUserId].sort().join('_');
+    socket.join(room);
+  });
+
+  // Leave conversation room
+  socket.on('leaveConversation', (otherUserId) => {
+    const room = [socket.userId, otherUserId].sort().join('_');
+    socket.leave(room);
   });
 });
 
@@ -124,6 +141,11 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/carts', cartRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/offers', offerRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 
 // 404 handler
 app.use((req, res) => {

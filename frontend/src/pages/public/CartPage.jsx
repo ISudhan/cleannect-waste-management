@@ -3,19 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../auth/AuthContext';
 
-// Map categories to fallback images
 const getCategoryFallbackImage = (category) => {
-  const categoryImages = {
-    plastic: '/plastic.webp',
-    paper: '/paper.webp',
-    metal: '/metal.webp',
-    organic: '/organic.webp',
-    electronic: '/electronic.webp',
-    textile: '/textile.webp',
-    // Default fallback for glass, other, or unknown categories
-    default: '/plastic.webp',
-  };
-  return categoryImages[category?.toLowerCase()] || categoryImages.default;
+  const map = { plastic: '/plastic.webp', paper: '/paper.webp', metal: '/metal.webp', organic: '/organic.webp', electronic: '/electronic.webp', textile: '/textile.webp' };
+  return map[category?.toLowerCase()] || '/plastic.webp';
 };
 
 function CartPage() {
@@ -27,222 +17,135 @@ function CartPage() {
 
   if (!user) {
     return (
-      <div className="space-y-4 text-center">
-        <p className="text-sm text-slate-600">Please log in to view your cart.</p>
-        <Link
-          to="/auth/login"
-          className="inline-block rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-        >
-          Log In
-        </Link>
+      <div className="empty-state card max-w-md mx-auto mt-12">
+        <p className="empty-state-icon">🔒</p>
+        <p className="text-base font-semibold text-slate-700">Sign in to view your cart</p>
+        <Link to="/auth/login" className="btn-primary mt-2">Log In</Link>
       </div>
     );
   }
 
   if (loading && !cart) {
-    return <div className="text-sm text-slate-600">Loading cart...</div>;
-  }
-
-  if (!cart || !cart.items || cart.items.length === 0) {
     return (
-      <div className="space-y-4 text-center">
-        <h1 className="text-2xl font-bold text-slate-900">Your Cart</h1>
-        <p className="text-sm text-slate-600">Your cart is empty.</p>
-        <Link
-          to="/"
-          className="inline-block rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-        >
-          Browse Listings
-        </Link>
+      <div className="empty-state">
+        <div className="spinner mx-auto" />
+        <p className="text-sm text-slate-400 mt-2">Loading cart…</p>
       </div>
     );
   }
 
-  const handleQuantityChange = async (itemId, newQuantity) => {
+  if (!cart?.items?.length) {
+    return (
+      <div className="empty-state card max-w-md mx-auto mt-12 fade-in">
+        <p className="empty-state-icon">🛒</p>
+        <p className="text-xl font-bold text-slate-900">Your cart is empty</p>
+        <p className="text-sm text-slate-400">Add some recyclable waste materials to get started.</p>
+        <Link to="/" className="btn-primary mt-2">Browse Marketplace</Link>
+      </div>
+    );
+  }
 
-
+  const handleQtyChange = async (itemId, newQty) => {
     setUpdatingItems((prev) => new Set(prev).add(itemId));
-    try {
-      await updateQuantity(itemId, newQuantity);
-    } catch (err) {
-      console.error('Failed to update quantity:', err);
-    } finally {
-      setUpdatingItems((prev) => {
-        const next = new Set(prev);
-        next.delete(itemId);
-        return next;
-      });
-    }
+    try { await updateQuantity(itemId, newQty); } catch { /* ignore */ }
+    finally { setUpdatingItems((prev) => { const s = new Set(prev); s.delete(itemId); return s; }); }
   };
 
-  const handleRemoveItem = async (itemId) => {
+  const handleRemove = async (itemId) => {
     setRemovingItems((prev) => new Set(prev).add(itemId));
-    try {
-      await removeFromCart(itemId);
-    } catch (err) {
-      console.error('Failed to remove item:', err);
-    } finally {
-      setRemovingItems((prev) => {
-        const next = new Set(prev);
-        next.delete(itemId);
-        return next;
-      });
-    }
+    try { await removeFromCart(itemId); } catch { /* ignore */ }
+    finally { setRemovingItems((prev) => { const s = new Set(prev); s.delete(itemId); return s; }); }
   };
 
-  const calculateSubtotal = () => {
-    if (!cart.items) return 0;
-    return cart.items.reduce((total, item) => {
-      if (item.listing && item.listing.price) {
-        return total + item.listing.price * item.quantity;
-      }
-      return total;
-    }, 0);
-  };
-
-  const subtotal = calculateSubtotal();
+  const subtotal = cart.items.reduce((sum, item) => {
+    return item.listing?.price ? sum + item.listing.price * item.quantity : sum;
+  }, 0);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900">Your Cart</h1>
+    <div className="fade-in space-y-6">
+      <h1 className="section-title">Shopping Cart <span className="text-slate-400 font-normal text-base ml-1">({cart.items.length} item{cart.items.length !== 1 ? 's' : ''})</span></h1>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Cart Items */}
-        <div className="lg:col-span-2 space-y-4">
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        {/* Items */}
+        <div className="space-y-3">
           {cart.items.map((item) => {
             if (!item.listing) return null;
-
-            const listing = item.listing;
-            const itemPrice = listing.price * item.quantity;
-            const isUpdating = updatingItems.has(item._id.toString());
-            const isRemoving = removingItems.has(item._id.toString());
+            const { listing } = item;
+            const isUpdating = updatingItems.has(item._id?.toString());
+            const isRemoving = removingItems.has(item._id?.toString());
+            const lineTotal = listing.price * item.quantity;
 
             return (
-              <div
-                key={item._id}
-                className="rounded-lg border bg-white p-4 shadow-sm"
-              >
+              <div key={item._id} className={`card p-4 transition-opacity ${isRemoving ? 'opacity-40 pointer-events-none' : ''}`}>
                 <div className="flex gap-4">
                   {/* Image */}
-                  <Link
-                    to={`/listing/${listing._id}`}
-                    className="flex-shrink-0"
-                  >
-                    <div className="h-24 w-24 rounded-md bg-slate-100 overflow-hidden">
+                  <Link to={`/listing/${listing._id}`} className="flex-shrink-0">
+                    <div className="h-20 w-20 overflow-hidden rounded-xl bg-slate-100">
                       <img
-                        src={listing.images && listing.images.length > 0 ? listing.images[0] : getCategoryFallbackImage(listing.category)}
+                        src={listing.images?.[0] || getCategoryFallbackImage(listing.category)}
                         alt={listing.title}
-                        className="h-full w-full object-contain"
-                        onError={(e) => {
-                          // Fallback to category image if the image fails to load
-                          e.target.src = getCategoryFallbackImage(listing.category);
-                        }}
+                        className="h-full w-full object-cover"
+                        onError={(e) => { e.target.src = getCategoryFallbackImage(listing.category); }}
                       />
                     </div>
                   </Link>
 
                   {/* Details */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <Link
-                          to={`/listing/${listing._id}`}
-                          className="text-base font-semibold text-slate-900 hover:text-emerald-600"
-                        >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <Link to={`/listing/${listing._id}`} className="font-semibold text-slate-900 hover:text-emerald-600 line-clamp-1">
                           {listing.title}
                         </Link>
-                        <p className="mt-1 text-sm text-slate-600 line-clamp-2">
-                          {listing.description}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                          <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
-                            {listing.category}
-                          </span>
-                          <span className="text-slate-600">
-                            {listing.quantity} {listing.unit} available
-                          </span>
-                        </div>
+                        <span className="badge badge-green mt-1">{listing.category}</span>
                       </div>
-
-                      {/* Remove Button */}
                       <button
                         type="button"
-                        onClick={() => handleRemoveItem(item._id)}
-                        disabled={isRemoving}
-                        className="flex-shrink-0 text-slate-400 hover:text-red-600 disabled:opacity-50"
-                        title="Remove item"
+                        onClick={() => handleRemove(item._id)}
+                        disabled={isRemoving || isUpdating}
+                        className="flex-shrink-0 rounded-lg p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500 transition disabled:opacity-50"
                       >
-                        <svg
-                          className="h-5 w-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       </button>
                     </div>
 
-                    {/* Quantity and Price */}
-                    <div className="mt-4 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <label htmlFor={`quantity-${item._id}`} className="text-sm text-slate-600">
-                          Quantity:
-                        </label>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleQuantityChange(item._id, item.quantity - 1)}
-                            disabled={isUpdating || isRemoving || item.quantity <= 0.01}
-                            className="flex h-8 w-8 items-center justify-center rounded border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                          >
-                            −
-                          </button>
-                          <input
-                            id={`quantity-${item._id}`}
-                            type="number"
-                            min="0.01"
-                            max={listing.quantity}
-                            step="0.01"
-                            value={item.quantity}
-                            onChange={(e) => {
-                              const newQty = parseFloat(e.target.value);
-                              if (!isNaN(newQty) && newQty > 0) {
-                                handleQuantityChange(item._id, newQty);
-                              }
-                            }}
-                            disabled={isUpdating || isRemoving}
-                            className="h-8 w-20 rounded border border-slate-300 px-2 text-center text-sm outline-none ring-emerald-500 focus:ring-1 disabled:opacity-50"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleQuantityChange(item._id, item.quantity + 1)}
-                            disabled={
-                              isUpdating ||
-                              isRemoving ||
-                              item.quantity >= listing.quantity
-                            }
-                            className="flex h-8 w-8 items-center justify-center rounded border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <span className="text-xs text-slate-500">
-                          {listing.unit}
-                        </span>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                      {/* Qty control */}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleQtyChange(item._id, item.quantity - 1)}
+                          disabled={isUpdating || isRemoving || item.quantity <= 0.01}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition"
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          min="0.01"
+                          max={listing.quantity}
+                          step="0.01"
+                          value={item.quantity}
+                          onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 0) handleQtyChange(item._id, v); }}
+                          disabled={isUpdating || isRemoving}
+                          className="h-8 w-20 rounded-lg border border-slate-200 px-2 text-center text-sm font-medium focus:border-emerald-400 focus:outline-none disabled:opacity-50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleQtyChange(item._id, item.quantity + 1)}
+                          disabled={isUpdating || isRemoving || item.quantity >= listing.quantity}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition"
+                        >
+                          +
+                        </button>
+                        <span className="text-xs text-slate-400">{listing.unit}</span>
                       </div>
+                      {/* Line total */}
                       <div className="text-right">
-                        <div className="text-base font-semibold text-slate-900">
-                          ₹{itemPrice.toFixed(2)}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          ₹{listing.price} per {listing.unit}
-                        </div>
+                        <p className="font-bold text-slate-900">₹{lineTotal.toFixed(2)}</p>
+                        <p className="text-xs text-slate-400">₹{listing.price}/{listing.unit}</p>
                       </div>
                     </div>
                   </div>
@@ -252,35 +155,37 @@ function CartPage() {
           })}
         </div>
 
-        {/* Order Summary */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-4 rounded-lg border bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-slate-900">Order Summary</h2>
-            <div className="space-y-3 border-t pt-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-600">Subtotal:</span>
-                <span className="font-medium text-slate-900">₹{subtotal.toFixed(2)}</span>
-              </div>
-              <div className="border-t pt-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-base font-semibold text-slate-900">Total:</span>
-                  <span className="text-lg font-bold text-slate-900">₹{subtotal.toFixed(2)}</span>
+        {/* Order summary */}
+        <div className="self-start sticky top-4">
+          <div className="card p-6 space-y-4">
+            <h2 className="font-bold text-slate-900 text-lg">Order Summary</h2>
+
+            <div className="space-y-2 text-sm">
+              {cart.items.map((item) => item.listing && (
+                <div key={item._id} className="flex justify-between text-slate-600">
+                  <span className="truncate mr-2">{item.listing.title}</span>
+                  <span className="flex-shrink-0">₹{(item.listing.price * item.quantity).toFixed(2)}</span>
                 </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate('/checkout')}
-                className="w-full rounded-md bg-emerald-600 px-4 py-3 text-sm font-medium text-white hover:bg-emerald-700"
-              >
-                Proceed to Checkout
-              </button>
-              <Link
-                to="/"
-                className="block w-full rounded-md border border-slate-300 px-4 py-3 text-center text-sm font-medium text-slate-800 hover:bg-slate-50"
-              >
-                Continue Shopping
-              </Link>
+              ))}
             </div>
+
+            <div className="divider" />
+
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-slate-900 text-base">Total</span>
+              <span className="text-xl font-bold text-emerald-600">₹{subtotal.toFixed(2)}</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate('/checkout')}
+              className="btn-primary w-full py-3 text-base"
+            >
+              Proceed to Checkout →
+            </button>
+            <Link to="/" className="btn-secondary w-full py-2.5 text-sm text-center block">
+              ← Continue Shopping
+            </Link>
           </div>
         </div>
       </div>
@@ -289,4 +194,3 @@ function CartPage() {
 }
 
 export default CartPage;
-

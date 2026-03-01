@@ -1,50 +1,25 @@
 import { useEffect, useState } from 'react';
-import apiClient from '../../lib/apiClient';
 import { useAuth } from '../../auth/AuthContext';
+import apiClient from '../../lib/apiClient';
 
 function ProfilePage() {
   const { user, setUser } = useAuth();
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    profilePicture: '',
-  });
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-  });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', address: '', profilePicture: '' });
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' });
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
-  const [profileMessage, setProfileMessage] = useState('');
-  const [passwordMessage, setPasswordMessage] = useState('');
+  const [profileMessage, setProfileMessage] = useState({ text: '', ok: true });
+  const [passwordMessage, setPasswordMessage] = useState({ text: '', ok: true });
 
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
-      try {
-        const res = await apiClient.get('/users/profile');
-        if (cancelled) return;
-        const u = res.data?.data?.user ?? {};
-        setForm({
-          name: u.name || '',
-          email: u.email || '',
-          phone: u.phone || '',
-          address: u.address || '',
-          profilePicture: u.profilePicture || '',
-        });
-      } catch {
-        // ignore, errors will be visible via general UX later
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
+    apiClient.get('/users/profile').then((res) => {
+      if (cancelled) return;
+      const u = res.data?.data?.user ?? {};
+      setForm({ name: u.name || '', email: u.email || '', phone: u.phone || '', address: u.address || '', profilePicture: u.profilePicture || '' });
+    }).catch(() => {}).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   const handleProfileChange = (e) => {
@@ -52,29 +27,17 @@ function ProfilePage() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handlePasswordChange = (e) => {
-    const { name, value } = e.target;
-    setPasswordForm((prev) => ({ ...prev, [name]: value }));
-  };
-
   const submitProfile = async (e) => {
     e.preventDefault();
-    setProfileMessage('');
+    setProfileMessage({ text: '', ok: true });
     setSavingProfile(true);
     try {
-      const res = await apiClient.put('/users/profile', {
-        name: form.name,
-        phone: form.phone,
-        address: form.address,
-        profilePicture: form.profilePicture,
-      });
+      const res = await apiClient.put('/users/profile', { name: form.name, phone: form.phone, address: form.address, profilePicture: form.profilePicture });
       const updated = res.data?.data?.user;
-      if (updated) {
-        setUser({ ...(user || {}), ...updated });
-      }
-      setProfileMessage('Profile updated.');
+      if (updated) setUser({ ...(user || {}), ...updated });
+      setProfileMessage({ text: '✓ Profile saved successfully!', ok: true });
     } catch (err) {
-      setProfileMessage(err.response?.data?.message || 'Failed to update profile.');
+      setProfileMessage({ text: err.response?.data?.message || 'Failed to update profile.', ok: false });
     } finally {
       setSavingProfile(false);
     }
@@ -82,157 +45,119 @@ function ProfilePage() {
 
   const submitPassword = async (e) => {
     e.preventDefault();
-    setPasswordMessage('');
+    setPasswordMessage({ text: '', ok: true });
     setSavingPassword(true);
     try {
       await apiClient.put('/users/change-password', passwordForm);
-      setPasswordMessage('Password updated successfully.');
+      setPasswordMessage({ text: '✓ Password updated!', ok: true });
       setPasswordForm({ currentPassword: '', newPassword: '' });
     } catch (err) {
-      setPasswordMessage(err.response?.data?.message || 'Failed to update password.');
+      setPasswordMessage({ text: err.response?.data?.message || 'Failed to update password.', ok: false });
     } finally {
       setSavingPassword(false);
     }
   };
 
   if (loading) {
-    return <div className="text-sm text-slate-600">Loading profile...</div>;
+    return (
+      <div className="empty-state">
+        <div className="spinner mx-auto" />
+      </div>
+    );
   }
 
+  const initials = form.name?.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2) || 'U';
+
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-xl font-semibold text-slate-900">Profile</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Manage your account details and security settings.
-        </p>
-      </header>
-      <div className="grid gap-6 md:grid-cols-[minmax(0,1.6fr),minmax(0,1fr)]">
-        <form
-          onSubmit={submitProfile}
-          className="space-y-4 rounded-lg border bg-white p-5 text-sm shadow-sm"
-        >
-          <h2 className="text-sm font-semibold text-slate-900">Profile details</h2>
-          {profileMessage && (
-            <p className="text-xs text-emerald-700" aria-live="polite">
-              {profileMessage}
-            </p>
+    <div className="space-y-6 fade-in max-w-3xl">
+      {/* Header with avatar */}
+      <div className="flex items-center gap-5">
+        <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 text-2xl font-bold text-white shadow-md">
+          {form.profilePicture ? (
+            <img src={form.profilePicture} alt={form.name} className="h-full w-full rounded-2xl object-cover" />
+          ) : initials}
+        </div>
+        <div>
+          <h1 className="section-title">{form.name || 'Your Profile'}</h1>
+          <p className="section-subtitle">{form.email}</p>
+          {user?.rating > 0 && (
+            <div className="mt-1 flex items-center gap-1 text-sm text-amber-500 font-medium">
+              {'★'.repeat(Math.round(user.rating))}{'☆'.repeat(5 - Math.round(user.rating))}
+              <span className="text-xs text-slate-400 ml-1">({user.totalRatings} reviews)</span>
+            </div>
           )}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1.5">
-              <label htmlFor="name" className="text-xs font-medium text-slate-700">
-                Name
-              </label>
-              <input
-                id="name"
-                name="name"
-                required
-                minLength={2}
-                value={form.name}
-                onChange={handleProfileChange}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-700">Email</label>
-              <input
-                value={form.email}
-                disabled
-                className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
-              />
-            </div>
+        </div>
+      </div>
+
+      {/* Profile form */}
+      <div className="card p-6">
+        <h2 className="mb-4 font-semibold text-slate-900">Profile Details</h2>
+        {profileMessage.text && (
+          <div className={`mb-4 rounded-xl px-4 py-3 text-sm border ${profileMessage.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+            {profileMessage.text}
+          </div>
+        )}
+        <form onSubmit={submitProfile} className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label htmlFor="name" className="block text-sm font-semibold text-slate-700">Full Name</label>
+            <input id="name" name="name" required minLength={2} value={form.name} onChange={handleProfileChange} className="input-field" />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="phone" className="text-xs font-medium text-slate-700">
-              Phone
-            </label>
-            <input
-              id="phone"
-              name="phone"
-              value={form.phone}
-              onChange={handleProfileChange}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
-            />
+            <label className="block text-sm font-semibold text-slate-700">Email <span className="font-normal text-slate-400">(read-only)</span></label>
+            <input value={form.email} disabled className="input-field bg-slate-50 text-slate-400 cursor-not-allowed" />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="address" className="text-xs font-medium text-slate-700">
-              Address
-            </label>
-            <textarea
-              id="address"
-              name="address"
-              rows={3}
-              value={form.address}
-              onChange={handleProfileChange}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
-            />
+            <label htmlFor="phone" className="block text-sm font-semibold text-slate-700">Phone</label>
+            <input id="phone" name="phone" value={form.phone} onChange={handleProfileChange} className="input-field" placeholder="+91 98765 43210" />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="profilePicture" className="text-xs font-medium text-slate-700">
-              Profile picture URL
-            </label>
-            <input
-              id="profilePicture"
-              name="profilePicture"
-              value={form.profilePicture}
-              onChange={handleProfileChange}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
-            />
+            <label htmlFor="profilePicture" className="block text-sm font-semibold text-slate-700">Avatar URL</label>
+            <input id="profilePicture" name="profilePicture" value={form.profilePicture} onChange={handleProfileChange} className="input-field" placeholder="https://..." />
           </div>
-          <button
-            type="submit"
-            disabled={savingProfile}
-            className="mt-2 inline-flex items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-          >
-            {savingProfile ? 'Saving...' : 'Save changes'}
-          </button>
+          <div className="sm:col-span-2 space-y-1.5">
+            <label htmlFor="address" className="block text-sm font-semibold text-slate-700">Address</label>
+            <textarea id="address" name="address" rows={2} value={form.address} onChange={handleProfileChange} className="input-field resize-none" />
+          </div>
+          <div className="sm:col-span-2">
+            <button type="submit" disabled={savingProfile} className="btn-primary py-2.5 px-6">
+              {savingProfile ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
         </form>
-        <form
-          onSubmit={submitPassword}
-          className="space-y-4 rounded-lg border bg-white p-5 text-sm shadow-sm"
-        >
-          <h2 className="text-sm font-semibold text-slate-900">Password</h2>
-          {passwordMessage && (
-            <p className="text-xs text-emerald-700" aria-live="polite">
-              {passwordMessage}
-            </p>
-          )}
+      </div>
+
+      {/* Password form */}
+      <div className="card p-6">
+        <h2 className="mb-4 font-semibold text-slate-900">Change Password</h2>
+        {passwordMessage.text && (
+          <div className={`mb-4 rounded-xl px-4 py-3 text-sm border ${passwordMessage.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+            {passwordMessage.text}
+          </div>
+        )}
+        <form onSubmit={submitPassword} className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <label htmlFor="currentPassword" className="text-xs font-medium text-slate-700">
-              Current password
-            </label>
+            <label htmlFor="currentPassword" className="block text-sm font-semibold text-slate-700">Current Password</label>
             <input
-              id="currentPassword"
-              name="currentPassword"
-              type="password"
-              required
+              id="currentPassword" name="currentPassword" type="password" required
               value={passwordForm.currentPassword}
-              onChange={handlePasswordChange}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
+              onChange={(e) => setPasswordForm((p) => ({ ...p, currentPassword: e.target.value }))}
+              className="input-field"
             />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="newPassword" className="text-xs font-medium text-slate-700">
-              New password
-            </label>
+            <label htmlFor="newPassword" className="block text-sm font-semibold text-slate-700">New Password</label>
             <input
-              id="newPassword"
-              name="newPassword"
-              type="password"
-              required
-              minLength={6}
+              id="newPassword" name="newPassword" type="password" required minLength={6}
               value={passwordForm.newPassword}
-              onChange={handlePasswordChange}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-emerald-500 focus:ring-1"
+              onChange={(e) => setPasswordForm((p) => ({ ...p, newPassword: e.target.value }))}
+              className="input-field"
             />
           </div>
-          <button
-            type="submit"
-            disabled={savingPassword}
-            className="mt-2 inline-flex items-center justify-center rounded-md border border-slate-300 px-4 py-2 text-xs font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-60"
-          >
-            {savingPassword ? 'Updating...' : 'Update password'}
-          </button>
+          <div>
+            <button type="submit" disabled={savingPassword} className="btn-secondary py-2.5 px-6">
+              {savingPassword ? 'Updating…' : 'Update Password'}
+            </button>
+          </div>
         </form>
       </div>
     </div>
@@ -240,6 +165,3 @@ function ProfilePage() {
 }
 
 export default ProfilePage;
-
-
-

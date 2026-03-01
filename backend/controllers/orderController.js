@@ -1,5 +1,6 @@
 const Order = require('../models/Order');
 const Listing = require('../models/Listing');
+const createNotification = require('../lib/createNotification');
 const { validationResult } = require('express-validator');
 
 // @desc    Create order
@@ -303,6 +304,13 @@ exports.updateOrderStatus = async (req, res) => {
         // If there's still quantity, keep status as 'available'
         await listing.save();
       }
+      // Notify buyer order was confirmed
+      await createNotification(req.io, order.buyer, {
+        type: 'order',
+        title: 'Order Confirmed',
+        message: `Your order has been confirmed by the seller.`,
+        link: `/dashboard/orders/${order._id}`,
+      });
     }
 
     // If cancelling: restore the reserved quantity and make available
@@ -314,6 +322,32 @@ exports.updateOrderStatus = async (req, res) => {
         }
         await listing.save();
       }
+      // Notify the other party
+      const notifyUserId = isBuyer ? order.seller : order.buyer;
+      await createNotification(req.io, notifyUserId, {
+        type: 'order',
+        title: 'Order Cancelled',
+        message: `An order has been cancelled.`,
+        link: `/dashboard/orders/${order._id}`,
+      });
+    }
+
+    if (status === 'shipped') {
+      await createNotification(req.io, order.buyer, {
+        type: 'order',
+        title: 'Order Shipped',
+        message: `Your order is on its way!`,
+        link: `/dashboard/orders/${order._id}`,
+      });
+    }
+
+    if (status === 'delivered') {
+      await createNotification(req.io, order.seller, {
+        type: 'order',
+        title: 'Order Delivered',
+        message: `The buyer has marked the order as delivered.`,
+        link: `/dashboard/orders/${order._id}`,
+      });
     }
 
     await order.populate([

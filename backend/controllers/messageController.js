@@ -1,5 +1,6 @@
 const Message = require('../models/Message');
 const mongoose = require('mongoose');
+const createNotification = require('../lib/createNotification');
 const { validationResult } = require('express-validator');
 
 // @desc    Get all conversations for current user
@@ -211,6 +212,13 @@ exports.sendMessage = async (req, res) => {
       },
     });
 
+    // Notify receiver
+    await createNotification(req.io, receiver, {
+      type: 'message',
+      title: 'New Message',
+      message: `${req.user.name} sent you a message`,
+      link: `/dashboard/messages/${req.user.id}`,
+    });
     res.status(201).json({
       success: true,
       data: { message },
