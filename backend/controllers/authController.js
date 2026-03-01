@@ -151,3 +151,17 @@ exports.getMe = async (req, res) => {
   }
 };
 
+
+// @desc    Handle Google OAuth callback — called after Passport verifies the user
+// @route   GET /api/auth/google/callback
+// @access  Public
+exports.googleCallback = (req, res) => {
+  try {
+    const token = req.user.generateToken();
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+  } catch (error) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/auth/login?error=oauth_failed`);
+  }
+};

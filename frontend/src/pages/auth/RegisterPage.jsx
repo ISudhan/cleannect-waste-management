@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
+import GoogleAuthButton from '../../components/GoogleAuthButton';
 
 const fields = [
   { id: 'name',     label: 'Full name',  type: 'text',     placeholder: 'Jane Smith',           required: true, minLength: 2 },
@@ -54,6 +55,16 @@ function RegisterPage() {
         </div>
 
         <div className="card p-8">
+        {/* Google Sign-Up */}
+          <GoogleAuthButton label="Sign up with Google" />
+
+          {/* Divider */}
+          <div className="relative flex items-center gap-3">
+            <div className="flex-1 border-t border-slate-200" />
+            <span className="text-xs text-slate-400 font-medium">or fill in the form below</span>
+            <div className="flex-1 border-t border-slate-200" />
+          </div>
+
           {error && (
             <div className="mb-5 flex items-start gap-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
               <span>⚠️</span>

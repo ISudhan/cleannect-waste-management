@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
+import GoogleAuthButton from '../../components/GoogleAuthButton';
 
 function LoginPage() {
   const { login } = useAuth();
@@ -45,6 +46,16 @@ function LoginPage() {
 
         {/* Card */}
         <div className="card p-8">
+        {/* Google Sign-In */}
+          <GoogleAuthButton label="Sign in with Google" />
+
+          {/* Divider */}
+          <div className="relative flex items-center gap-3">
+            <div className="flex-1 border-t border-slate-200" />
+            <span className="text-xs text-slate-400 font-medium">or continue with email</span>
+            <div className="flex-1 border-t border-slate-200" />
+          </div>
+
           {error && (
             <div className="mb-5 flex items-start gap-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
               <span className="text-base">⚠️</span>

@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const passport = require('passport');
 require('dotenv').config();
 const connectDB = require('./config/database');
 const jwt = require('jsonwebtoken');
@@ -128,6 +129,10 @@ app.post('/api/payments/verify', express.raw({ type: 'application/json' }), veri
 // Body parser middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Passport (Google OAuth — stateless, no sessions needed)
+require('./config/passport');
+app.use(passport.initialize());
 
 // Routes
 app.get('/api/health', (req, res) => {

@@ -66,6 +66,24 @@ export function AuthProvider({ children }) {
     saveAuth(null, null);
   };
 
+  // Used by OAuth callback page — save token then fetch user profile
+  const loginWithToken = async (nextToken) => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: nextToken }));
+    setToken(nextToken);
+    try {
+      const res = await apiClient.get('/auth/me', {
+        headers: { Authorization: `Bearer ${nextToken}` },
+      });
+      const u = res.data?.data?.user ?? null;
+      saveAuth(u, nextToken);
+      return u;
+    } catch {
+      window.localStorage.removeItem(STORAGE_KEY);
+      setToken(null);
+      throw new Error('Failed to fetch user after OAuth');
+    }
+  };
+
   const value = {
     user,
     token,
@@ -73,6 +91,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    loginWithToken,
     setUser,
   };
 
