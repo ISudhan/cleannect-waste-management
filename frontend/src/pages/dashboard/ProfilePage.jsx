@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import apiClient from '../../lib/apiClient';
+import LocationMap from '../../components/LocationMap';
 
 function ProfilePage() {
   const { user, setUser } = useAuth();
-  const [form, setForm] = useState({ name: '', email: '', phone: '', address: '', profilePicture: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', address: '', city: '', state: '', country: 'India', profilePicture: '' });
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' });
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -17,7 +18,16 @@ function ProfilePage() {
     apiClient.get('/users/profile').then((res) => {
       if (cancelled) return;
       const u = res.data?.data?.user ?? {};
-      setForm({ name: u.name || '', email: u.email || '', phone: u.phone || '', address: u.address || '', profilePicture: u.profilePicture || '' });
+      setForm({
+        name: u.name || '',
+        email: u.email || '',
+        phone: u.phone || '',
+        address: u.address || '',
+        city: u.address?.city || '',
+        state: u.address?.state || '',
+        country: u.address?.country || 'India',
+        profilePicture: u.profilePicture || '',
+      });
     }).catch(() => {}).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -125,6 +135,21 @@ function ProfilePage() {
           </div>
         </form>
       </div>
+
+      {/* Location Map */}
+      {(form.city || form.state) && (
+        <div className="card p-6">
+          <h2 className="mb-3 font-semibold text-slate-900">📍 My Location</h2>
+          <LocationMap
+            location={{ city: form.city, state: form.state, country: form.country }}
+            height="260px"
+            zoom={12}
+          />
+          <p className="mt-2 text-sm text-slate-500">
+            {[form.city, form.state, form.country].filter(Boolean).join(', ')}
+          </p>
+        </div>
+      )}
 
       {/* Password form */}
       <div className="card p-6">

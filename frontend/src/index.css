@@ -1,12 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import 'leaflet/dist/leaflet.css';
 @import "tailwindcss";
 
 @layer base {
-  *, *::before, *::after {
+
+  *,
+  *::before,
+  *::after {
     box-sizing: border-box;
   }
 
-  html, body, #root {
+  html,
+  body,
+  #root {
     height: 100%;
   }
 
@@ -28,19 +34,23 @@
     width: 6px;
     height: 6px;
   }
+
   ::-webkit-scrollbar-track {
     background: #f1f5f9;
   }
+
   ::-webkit-scrollbar-thumb {
     background: #cbd5e1;
     border-radius: 3px;
   }
+
   ::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
   }
 }
 
 @layer components {
+
   /* ── Buttons ── */
   .btn-primary {
     display: inline-flex;
@@ -58,11 +68,13 @@
     transition: all 0.2s ease;
     box-shadow: 0 1px 3px rgba(5, 150, 105, 0.3);
   }
+
   .btn-primary:hover:not(:disabled) {
     background: linear-gradient(135deg, #047857, #059669);
     box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4);
     transform: translateY(-1px);
   }
+
   .btn-primary:disabled {
     opacity: 0.55;
     cursor: not-allowed;
@@ -84,11 +96,13 @@
     cursor: pointer;
     transition: all 0.2s ease;
   }
+
   .btn-secondary:hover:not(:disabled) {
     border-color: #10b981;
     color: #059669;
     background: #f0fdf4;
   }
+
   .btn-secondary:disabled {
     opacity: 0.55;
     cursor: not-allowed;
@@ -109,6 +123,7 @@
     cursor: pointer;
     transition: all 0.2s ease;
   }
+
   .btn-danger:hover:not(:disabled) {
     background: #fee2e2;
     border-color: #dc2626;
@@ -126,10 +141,12 @@
     transition: border-color 0.2s, box-shadow 0.2s;
     outline: none;
   }
+
   .input-field:focus {
     border-color: #10b981;
     box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
   }
+
   .input-field::placeholder {
     color: #94a3b8;
   }
@@ -139,12 +156,14 @@
     background: white;
     border: 1px solid #e2e8f0;
     border-radius: 1rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     transition: box-shadow 0.2s, transform 0.2s;
   }
+
   .card:hover {
-    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   }
+
   .card-hover:hover {
     transform: translateY(-2px);
   }
@@ -159,22 +178,77 @@
     font-weight: 600;
     letter-spacing: 0.02em;
   }
-  .badge-green  { background: #dcfce7; color: #15803d; }
-  .badge-amber  { background: #fef3c7; color: #b45309; }
-  .badge-red    { background: #fee2e2; color: #dc2626; }
-  .badge-blue   { background: #dbeafe; color: #1d4ed8; }
-  .badge-slate  { background: #f1f5f9; color: #475569; }
-  .badge-purple { background: #ede9fe; color: #7c3aed; }
+
+  .badge-green {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  .badge-amber {
+    background: #fef3c7;
+    color: #b45309;
+  }
+
+  .badge-red {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+
+  .badge-blue {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+
+  .badge-slate {
+    background: #f1f5f9;
+    color: #475569;
+  }
+
+  .badge-purple {
+    background: #ede9fe;
+    color: #7c3aed;
+  }
 
   /* ── Status badges ── */
-  .status-pending   { background: #fef3c7; color: #b45309; }
-  .status-confirmed { background: #dbeafe; color: #1d4ed8; }
-  .status-shipped   { background: #ede9fe; color: #7c3aed; }
-  .status-delivered { background: #dcfce7; color: #15803d; }
-  .status-cancelled { background: #fee2e2; color: #dc2626;  }
-  .status-available { background: #dcfce7; color: #15803d; }
-  .status-sold      { background: #fee2e2; color: #dc2626;  }
-  .status-archived  { background: #f1f5f9; color: #475569; }
+  .status-pending {
+    background: #fef3c7;
+    color: #b45309;
+  }
+
+  .status-confirmed {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+
+  .status-shipped {
+    background: #ede9fe;
+    color: #7c3aed;
+  }
+
+  .status-delivered {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  .status-cancelled {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+
+  .status-available {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  .status-sold {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+
+  .status-archived {
+    background: #f1f5f9;
+    color: #475569;
+  }
 
   /* ── Page container ── */
   .page-container {
@@ -189,6 +263,7 @@
     font-weight: 700;
     color: #0f172a;
   }
+
   .section-subtitle {
     font-size: 0.875rem;
     color: #64748b;
@@ -213,7 +288,9 @@
   }
 
   @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   /* ── Empty state ── */
@@ -226,6 +303,7 @@
     text-align: center;
     gap: 0.75rem;
   }
+
   .empty-state-icon {
     font-size: 3rem;
     opacity: 0.5;
@@ -234,18 +312,32 @@
 
   /* ── Fade-in animation ── */
   @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
+
   .fade-in {
     animation: fadeInUp 0.3s ease both;
   }
 
   /* ── Shimmer skeleton ── */
   @keyframes shimmer {
-    0%   { background-position: -400px 0; }
-    100% { background-position: 400px 0; }
+    0% {
+      background-position: -400px 0;
+    }
+
+    100% {
+      background-position: 400px 0;
+    }
   }
+
   .skeleton {
     background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
     background-size: 800px 100%;

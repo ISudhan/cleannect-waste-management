@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useCart } from '../../contexts/CartContext';
 import { useWishlist } from '../../contexts/WishlistContext';
 import ReviewsSection from '../../components/ReviewsSection';
+import LocationMap from '../../components/LocationMap';
 
 // Map categories to fallback images
 const getCategoryFallbackImage = (category) => {
@@ -432,6 +433,29 @@ function ListingDetailPage() {
         sellerId={listing.seller?._id}
         listingId={listing._id}
       />
+
+      {/* Pickup Location Map */}
+      {(listing.location?.city || listing.location?.state || listing.location?.lat) && (
+        <div className="card p-5">
+          <h2 className="section-title text-base mb-3">📍 Pickup Location</h2>
+          <LocationMap
+            location={{
+              city: listing.location?.city,
+              state: listing.location?.state,
+              country: listing.location?.country,
+              lat: listing.location?.lat,
+              lng: listing.location?.lng,
+            }}
+            height="300px"
+            zoom={13}
+          />
+          <p className="mt-2 text-sm text-slate-500">
+            {[listing.location?.city, listing.location?.state, listing.location?.country]
+              .filter(Boolean)
+              .join(', ')}
+          </p>
+        </div>
+      )}
 
       {/* Make an Offer Modal */}
       {showOfferModal && (

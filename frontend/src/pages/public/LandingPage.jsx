@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../../lib/apiClient';
+
+const MarketplaceMap = lazy(() => import('../../components/MarketplaceMap'));
 
 const categories = [
   'plastic',
@@ -70,6 +72,7 @@ function LandingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'map'
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -379,14 +382,42 @@ function LandingPage() {
         {/* Results Header */}
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-bold text-slate-900">Live Marketplace</h2>
-          {!loading && listings.length > 0 && (
-            <p className="text-sm text-slate-400">
-              {listings.length} listing{listings.length !== 1 ? 's' : ''}
-            </p>
-          )}
+          <div className="flex items-center gap-2">
+            {!loading && listings.length > 0 && (
+              <p className="text-sm text-slate-400 mr-2">
+                {listings.length} listing{listings.length !== 1 ? 's' : ''}
+              </p>
+            )}
+            {/* List / Map toggle */}
+            <div className="flex rounded-xl border border-slate-200 overflow-hidden text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1.5 transition ${
+                  viewMode === 'list' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                ☰ List
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('map')}
+                className={`px-3 py-1.5 transition ${
+                  viewMode === 'map' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                🗺 Map
+              </button>
+            </div>
+          </div>
         </div>
 
-          {loading ? (
+          {/* ── Map view ── */}
+          {viewMode === 'map' ? (
+            <Suspense fallback={<div className="skeleton rounded-2xl" style={{ height: 480 }} />}>
+              <MarketplaceMap listings={listings} height="480px" />
+            </Suspense>
+          ) : loading ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {[...Array(8)].map((_, i) => (
                 <div key={i} className="rounded-2xl border border-slate-100 overflow-hidden">
