@@ -45,6 +45,83 @@
 
 ---
 
+## 🔄 Project Workflow
+
+### End-to-End User Journey
+
+```mermaid
+flowchart TD
+    A([User Visits CleanNect]) --> B{Has Account?}
+    B -- No --> C[Register / Google OAuth]
+    B -- Yes --> D[Login → JWT Issued]
+    C --> D
+
+    D --> E{User Intent}
+
+    E -- Sell Waste --> F[Create Listing]
+    F --> F1[Upload Images → Cloudinary]
+    F1 --> F2[Set Price, Category, Location]
+    F2 --> F3[Listing Live on Marketplace]
+
+    E -- Buy Waste --> G[Browse Marketplace]
+    G --> G1[Search & Filter by Category / Location]
+    G1 --> G2{Decision}
+    G2 -- Wishlist --> G3[Save for Later]
+    G2 -- Add to Cart --> H[Cart]
+    G2 -- Make Offer --> O[Offer System]
+
+    O --> O1{Seller Response}
+    O1 -- Accepts --> H
+    O1 -- Counter-offer --> O
+    O1 -- Rejects --> G
+
+    H --> I[Checkout]
+    I --> J[Stripe Payment]
+    J --> J1[Webhook → Order Confirmed]
+    J1 --> K[Order Lifecycle]
+    K --> K1[pending → confirmed → shipped → delivered]
+    K1 --> L[Review & Rating]
+
+    D --> M[Real-time Features]
+    M --> M1[Socket.io Chat with Seller/Buyer]
+    M --> M2[Live Notifications for Offers & Orders]
+
+    D --> N[Seller Dashboard]
+    N --> N1[Analytics: Revenue & Order Trends]
+    N --> N2[Manage Listings & Offers]
+    N --> N3[Track Orders]
+```
+
+### Workflow Breakdown
+
+#### 🧑 Buyer Flow
+1. **Browse** — Search listings by category (plastic, metal, e-waste, etc.), price range, or location using the interactive map
+2. **Discover** — View listing details, seller rating, images, and exact pickup location on a Leaflet map
+3. **Engage** — Add to wishlist, cart, or make a custom price offer to the seller
+4. **Negotiate** — The offer system allows back-and-forth counter-offers via real-time notifications
+5. **Purchase** — Checkout with Stripe; payment intent created server-side, confirmed client-side
+6. **Track** — Monitor order lifecycle from `pending` → `confirmed` → `shipped` → `delivered`
+7. **Review** — Leave a star rating and review upon order completion
+
+#### 🏭 Seller Flow
+1. **List** — Create a listing with title, description, category, quantity, unit, price, and up to multiple images
+2. **Geo-tag** — Attach a pickup address; coordinates are stored for map display
+3. **Receive Offers** — Get notified instantly when a buyer makes an offer; accept, reject, or counter
+4. **Manage Orders** — View incoming orders and update shipment status
+5. **Analyse** — Use the analytics dashboard for revenue charts, bestselling items, and order volume trends
+
+#### ⚡ Real-time Layer
+```
+Client (React)  ←──Socket.io──→  Server (Express)
+     │                                  │
+     │  joinConversation(userId)         │  io.to(room).emit('newMessage')
+     │  typing / stopTyping             │  io.to(userId).emit('notification')
+     └──────────────────────────────────┘
+```
+All real-time events are authenticated via JWT tokens on the Socket.io handshake.
+
+---
+
 ## 🏗️ Architecture
 
 ```
@@ -249,8 +326,6 @@ The project is deployed on **Vercel** using a monorepo configuration:
 - **Backend API** — Express.js wrapped as Vercel serverless functions (`api/index.js`)
 - **Database** — MongoDB Atlas (cloud-hosted)
 - **Media** — Cloudinary CDN
-
-> **Note:** Real-time Socket.io features require a persistent server. For production real-time support, deploy the backend separately to [Railway](https://railway.app) or [Render](https://render.com) and update `VITE_API_BASE_URL` accordingly.
 
 ---
 
