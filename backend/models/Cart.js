@@ -28,8 +28,5 @@ const cartSchema = new mongoose.Schema(
   }
 );
 
-// Index on user for fast lookups
-cartSchema.index({ user: 1 });
-
 module.exports = mongoose.model('Cart', cartSchema);
 

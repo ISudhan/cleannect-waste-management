@@ -24,6 +24,7 @@ import WishlistPage from './pages/dashboard/WishlistPage';
 import ProtectedRoute from './routes/ProtectedRoute';
 
 function App() {
+  console.log("API BASE:", import.meta.env.VITE_API_BASE_URL);
   return (
     <BrowserRouter>
       <Routes>
@@ -66,6 +67,7 @@ function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      
     </BrowserRouter>
   );
 }
