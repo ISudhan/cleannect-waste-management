@@ -4,6 +4,7 @@
   "outputDirectory": "frontend/dist",
   "installCommand": "npm install",
   "rewrites": [
+    
     {
       "source": "/(.*)",
       "destination": "/index.html"
