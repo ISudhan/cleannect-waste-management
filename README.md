@@ -1,5 +1,6 @@
 <div align="center">
 
+
 # ♻️ CleanNect
 
 ### *A Full-Stack Waste Management Marketplace*
