@@ -2,7 +2,6 @@
 // This wraps the Express app for Vercel's serverless function runtime.
 // NOTE: Socket.io real-time features will NOT work on Vercel (stateless).
 // For full Socket.io support, deploy the backend to Railway/Render/Fly.io.
-
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
