@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../../lib/apiClient';
+import { getSocket } from '../../lib/socket';
+import { useAuth } from '../../auth/AuthContext';
 
 const STATUS_COLORS = {
   pending:   'status-pending',
@@ -19,31 +21,51 @@ const TAB_OPTIONS = [
 const STATUS_OPTIONS = ['', 'pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
 
 function OrdersPage() {
+  const { token } = useAuth();
   const [orders, setOrders] = useState([]);
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const loadOrders = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await apiClient.get('/orders', {
+        params: { status: status || undefined, role: role || undefined },
+      });
+      setOrders(res.data?.data?.orders ?? []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to load orders.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const res = await apiClient.get('/orders', {
-          params: { status: status || undefined, role: role || undefined },
-        });
-        if (!cancelled) setOrders(res.data?.data?.orders ?? []);
-      } catch (err) {
-        if (!cancelled) setError(err.response?.data?.message || 'Failed to load orders.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
-    return () => { cancelled = true; };
+    loadOrders();
   }, [status, role]);
+
+  // Real-time socket listener
+  useEffect(() => {
+    const socket = getSocket(token);
+    if (!socket) return;
+
+    const handleOrderEvent = () => {
+      loadOrders();
+    };
+
+    socket.on('newOrder', handleOrderEvent);
+    socket.on('orderCreated', handleOrderEvent);
+    socket.on('orderStatusChanged', handleOrderEvent);
+
+    return () => {
+      socket.off('newOrder', handleOrderEvent);
+      socket.off('orderCreated', handleOrderEvent);
+      socket.off('orderStatusChanged', handleOrderEvent);
+    };
+  }, [token, status, role]);
 
   return (
     <div className="space-y-5 fade-in">

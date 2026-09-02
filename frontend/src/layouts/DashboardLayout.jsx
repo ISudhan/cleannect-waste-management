@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import GeminiEcoChatWidget from '../components/GeminiEcoChatWidget';
 
 const navGroups = [
   {
@@ -9,6 +10,13 @@ const navGroups = [
     items: [
       { to: '/dashboard', icon: '🏠', label: 'Dashboard', end: true },
       { to: '/dashboard/analytics', icon: '📊', label: 'Analytics' },
+    ],
+  },
+  {
+    label: 'AI & Logistics',
+    items: [
+      { to: '/dashboard/route-optimizer', icon: '🗺️', label: 'Route Optimizer' },
+      { to: '/dashboard/wealth-out-of-waste', icon: '✨', label: 'Wealth out of Waste' },
     ],
   },
   {
@@ -167,6 +175,9 @@ function DashboardLayout() {
           </div>
         </main>
       </div>
+
+      {/* Real-time Gemini Floating Assistant */}
+      <GeminiEcoChatWidget />
     </div>
   );
 }

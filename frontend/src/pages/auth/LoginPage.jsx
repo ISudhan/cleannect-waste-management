@@ -19,7 +19,9 @@ function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      const from = location.state?.from?.pathname || '/dashboard';
+      const searchParams = new URLSearchParams(location.search);
+      const redirectParam = searchParams.get('redirect');
+      const from = redirectParam || location.state?.from?.pathname || '/dashboard';
       navigate(from, { replace: true });
     } catch (err) {
       const msg =

@@ -344,4 +344,18 @@
     animation: shimmer 1.4s infinite;
     border-radius: 0.5rem;
   }
+
+  /* ── Route & Map Utilities ── */
+  .custom-route-marker, .depot-marker {
+    background: transparent !important;
+    border: none !important;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }

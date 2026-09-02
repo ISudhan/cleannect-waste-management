@@ -25,7 +25,29 @@ function ListingFormPage({ mode }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!isEdit || !id) return;
+    if (!isEdit) {
+      const prefill = sessionStorage.getItem('prefill_listing');
+      if (prefill) {
+        try {
+          const parsed = JSON.parse(prefill);
+          setForm((prev) => ({
+            ...prev,
+            title: parsed.title || prev.title,
+            description: parsed.description || prev.description,
+            category: parsed.category || prev.category,
+            price: parsed.price ?? prev.price,
+            unit: parsed.unit || prev.unit,
+            quantity: parsed.quantity || prev.quantity,
+          }));
+          sessionStorage.removeItem('prefill_listing');
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      return;
+    }
+
+    if (!id) return;
     let cancelled = false;
     const load = async () => {
       try {

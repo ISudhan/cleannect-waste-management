@@ -98,6 +98,17 @@ exports.createOrder = async (req, res) => {
       { path: 'seller', select: 'name email phone' },
     ]);
 
+    // Real-time socket emissions
+    if (req.io) {
+      req.io.to(order.seller._id.toString()).emit('newOrder', { order });
+      req.io.to(order.buyer._id.toString()).emit('orderCreated', { order });
+      req.io.emit('listingStockChanged', {
+        listingId: updatedListing._id,
+        remainingQuantity: updatedListing.quantity,
+        status: updatedListing.status,
+      });
+    }
+
     res.status(201).json({
       success: true,
       data: { order },
@@ -355,6 +366,13 @@ exports.updateOrderStatus = async (req, res) => {
       { path: 'buyer', select: 'name email phone profilePicture' },
       { path: 'seller', select: 'name email phone profilePicture' },
     ]);
+
+    // Real-time socket emission
+    if (req.io) {
+      const payload = { orderId: order._id, status, order };
+      req.io.to(order.buyer._id.toString()).emit('orderStatusChanged', payload);
+      req.io.to(order.seller._id.toString()).emit('orderStatusChanged', payload);
+    }
 
     res.status(200).json({
       success: true,

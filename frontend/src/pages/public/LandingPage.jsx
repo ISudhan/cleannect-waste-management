@@ -1,521 +1,591 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import apiClient from '../../lib/apiClient';
+import { useAuth } from '../../auth/AuthContext';
+import { useCart } from '../../contexts/CartContext';
+import { useWishlist } from '../../contexts/WishlistContext';
+import { getSocket } from '../../lib/socket';
+import AuthPromptModal from '../../components/AuthPromptModal';
 
 const MarketplaceMap = lazy(() => import('../../components/MarketplaceMap'));
 
 const categories = [
-  'plastic',
-  'paper',
-  'metal',
-  'glass',
-  'organic',
-  'electronic',
-  'textile',
-  'other',
+  { id: '', label: 'All Categories', icon: '📦' },
+  { id: 'plastic', label: 'Plastics (PET/HDPE)', icon: '🧴' },
+  { id: 'metal', label: 'Scrap Metals', icon: '🔩' },
+  { id: 'paper', label: 'Paper & Cardboard', icon: '📦' },
+  { id: 'electronic', label: 'E-Waste & PCBs', icon: '💻' },
+  { id: 'glass', label: 'Glass Cullet', icon: '🍾' },
+  { id: 'organic', label: 'Organic Biomass', icon: '🌿' },
+  { id: 'textile', label: 'Textile Fabric', icon: '🧵' },
 ];
 
 const sortOptions = [
-  { value: 'createdAt', label: 'Newest First', order: 'desc' },
-  { value: 'createdAt', label: 'Oldest First', order: 'asc' },
-  { value: 'price', label: 'Price: Low to High', order: 'asc' },
-  { value: 'price', label: 'Price: High to Low', order: 'desc' },
-  { value: 'listingStatus', label: 'Listing Status', order: 'asc' },
+  { value: 'createdAt_desc', label: 'Featured / Newest First', sortBy: 'createdAt', sortOrder: 'desc' },
+  { value: 'price_asc', label: 'Price: Low to High', sortBy: 'price', sortOrder: 'asc' },
+  { value: 'price_desc', label: 'Price: High to Low', sortBy: 'price', sortOrder: 'desc' },
+  { value: 'quantity_desc', label: 'Highest Bulk Quantity', sortBy: 'quantity', sortOrder: 'desc' },
 ];
 
-// Map categories to fallback images
+// Fallback imagery
 const getCategoryFallbackImage = (category) => {
-  const categoryImages = {
-    plastic: '/plastic.webp',
-    paper: '/paper.webp',
-    metal: '/metal.webp',
-    organic: '/organic.webp',
-    electronic: '/electronic.webp',
-    textile: '/textile.webp',
-    // Default fallback for glass, other, or unknown categories
-    default: '/plastic.webp',
+  const map = {
+    plastic: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=600&auto=format&fit=crop&q=80',
+    metal: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&auto=format&fit=crop&q=80',
+    paper: 'https://images.unsplash.com/photo-1607344645866-009c320c5ab8?w=600&auto=format&fit=crop&q=80',
+    electronic: 'https://images.unsplash.com/photo-1597733336794-12d05021d510?w=600&auto=format&fit=crop&q=80',
+    glass: 'https://images.unsplash.com/photo-1516962215378-7fa2e137ae93?w=600&auto=format&fit=crop&q=80',
+    organic: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=600&auto=format&fit=crop&q=80',
+    textile: 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=600&auto=format&fit=crop&q=80',
   };
-  return categoryImages[category?.toLowerCase()] || categoryImages.default;
+  return map[category?.toLowerCase()] || map.plastic;
 };
 
-// Derive status for badge display using quantity and initialQuantity
-const deriveListingStatus = (listing) => {
-  const toNumber = (val) => {
-    const num = Number(val);
-    return Number.isFinite(num) ? num : null;
-  };
+export default function LandingPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { addToCart } = useCart();
+  const { isWishlisted, toggleWishlist } = useWishlist();
 
-  const remainingQuantity = toNumber(listing?.quantity) ?? 0;
-  const initialQuantity = toNumber(listing?.initialQuantity);
-  const backendStatus = listing?.status || 'available';
-
-  const isUnavailable = remainingQuantity <= 0 || backendStatus !== 'available';
-
-  const isSellingFast =
-    !isUnavailable &&
-    initialQuantity !== null &&
-    initialQuantity > 0 &&
-    remainingQuantity > 0 &&
-    remainingQuantity <= initialQuantity / 2;
-
-  if (isUnavailable) {
-    return { label: 'Unavailable', classes: 'bg-slate-100 text-slate-700' };
-  }
-  if (isSellingFast) {
-    return { label: 'Selling fast', classes: 'bg-amber-50 text-amber-700' };
-  }
-  return { label: 'Available', classes: 'bg-green-50 text-green-700' };
-};
-
-function LandingPage() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState('list'); // 'list' | 'map'
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'map'
+  const [addingCartId, setAddingCartId] = useState(null);
+  const [cartSuccessNotice, setCartSuccessNotice] = useState(null);
 
-  // Filter states
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
+  // Auth Gate Modal State
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalDetails, setAuthModalDetails] = useState({
+    title: 'Sign In to Purchase Scrap',
+    message: 'Please sign in or create an account to purchase items, add to cart, or submit price offers.',
+  });
+
+  // Filter query parameters
+  const searchQuery = searchParams.get('search') || '';
+  const selectedCategory = searchParams.get('category') || '';
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [cityFilter, setCityFilter] = useState('');
+  const [selectedSort, setSelectedSort] = useState('createdAt_desc');
+
+  // Load listings from API
+  const loadListings = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const selectedSortOpt = sortOptions.find((s) => s.value === selectedSort) || sortOptions[0];
+      const params = {
+        page: 1,
+        limit: 24,
+        sortBy: selectedSortOpt.sortBy,
+        sortOrder: selectedSortOpt.sortOrder,
+      };
+
+      if (searchQuery.trim()) params.search = searchQuery.trim();
+      if (selectedCategory) params.category = selectedCategory;
+      if (minPrice) params.minPrice = minPrice;
+      if (maxPrice) params.maxPrice = maxPrice;
+      if (cityFilter.trim()) params.city = cityFilter.trim();
+
+      const res = await apiClient.get('/listings', { params });
+      setListings(res.data?.data?.listings || []);
+    } catch (err) {
+      console.error('Failed to load listings:', err);
+      setError(err.response?.data?.message || 'Failed to load marketplace listings.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const params = {
-          page: 1,
-          limit: 8,
-        };
+    loadListings();
+  }, [searchQuery, selectedCategory, selectedSort, minPrice, maxPrice, cityFilter]);
 
-        if (searchQuery.trim()) {
-          params.search = searchQuery.trim();
-        }
-        if (selectedCategory) {
-          params.category = selectedCategory;
-        }
-        if (minPrice) {
-          params.minPrice = minPrice;
-        }
-        if (maxPrice) {
-          params.maxPrice = maxPrice;
-        }
-        if (city.trim()) {
-          params.city = city.trim();
-        }
-        if (state.trim()) {
-          params.state = state.trim();
-        }
-        if (sortBy) {
-          params.sortBy = sortBy;
-          params.sortOrder = sortOrder;
-        }
+  // Real-time stock change listener via Socket.io
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
 
-        const res = await apiClient.get('/listings', { params });
-        if (!cancelled) {
-          let incoming = res.data?.data?.listings ?? [];
-
-          // Apply client-side sort for derived listingStatus
-          if (sortBy === 'listingStatus') {
-            const statusPriority = {
-              'Available': 2,
-              'Selling fast': 1,
-              'Unavailable': 0,
-            };
-            incoming = [...incoming].sort((a, b) => {
-              const { label: labelA } = deriveListingStatus(a);
-              const { label: labelB } = deriveListingStatus(b);
-              const pa = statusPriority[labelA] ?? -1;
-              const pb = statusPriority[labelB] ?? -1;
-              if (pa === pb) return 0;
-              return sortOrder === 'desc' ? pb - pa : pa - pb;
-            });
-          }
-
-          setListings(incoming);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err.response?.data?.message || 'Failed to load listings.');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+    const handleStockUpdate = (data) => {
+      if (data?.listingId) {
+        setListings((prevListings) =>
+          prevListings.map((item) =>
+            item._id === data.listingId
+              ? {
+                  ...item,
+                  quantity: data.remainingQuantity,
+                  status: data.status || (data.remainingQuantity <= 0 ? 'sold' : item.status),
+                }
+              : item
+          )
+        );
       }
     };
 
-    // Debounce search
-    const timeoutId = setTimeout(() => {
-      load();
-    }, searchQuery ? 500 : 0);
-
+    socket.on('listingStockChanged', handleStockUpdate);
     return () => {
-      cancelled = true;
-      clearTimeout(timeoutId);
+      socket.off('listingStockChanged', handleStockUpdate);
     };
-  }, [searchQuery, selectedCategory, minPrice, maxPrice, city, state, sortBy, sortOrder]);
+  }, []);
 
-  const handleClearFilters = () => {
-    setSearchQuery('');
-    setSelectedCategory('');
-    setMinPrice('');
-    setMaxPrice('');
-    setCity('');
-    setState('');
-    setSortBy('createdAt');
-    setSortOrder('desc');
-  };
+  // Handle Category Click
+  function handleSelectCategory(catId) {
+    const nextParams = new URLSearchParams(searchParams);
+    if (catId) {
+      nextParams.set('category', catId);
+    } else {
+      nextParams.delete('category');
+    }
+    setSearchParams(nextParams);
+  }
 
-  const hasActiveFilters =
-    searchQuery ||
-    selectedCategory ||
-    minPrice ||
-    maxPrice ||
-    city ||
-    state ||
-    sortBy !== 'createdAt' ||
-    sortOrder !== 'desc';
+  // Handle Add to Cart (with Auth Gate)
+  async function handleAddToCartClick(e, listing) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Check auth
+    if (!user) {
+      setAuthModalDetails({
+        title: 'Sign In to Add to Cart',
+        message: `Sign in to add "${listing.title}" to your cart and proceed with checkout.`,
+      });
+      setShowAuthModal(true);
+      return;
+    }
+
+    if (listing.seller?._id === user.id || listing.seller?._id?.toString() === user.id) {
+      alert('You cannot purchase your own listing.');
+      return;
+    }
+
+    setAddingCartId(listing._id);
+    try {
+      await addToCart(listing._id, 1);
+      setCartSuccessNotice(`🛒 Added "${listing.title}" (1 ${listing.unit}) to your cart!`);
+      setTimeout(() => setCartSuccessNotice(null), 4000);
+    } catch (err) {
+      alert(err.message || 'Failed to add item to cart');
+    } finally {
+      setAddingCartId(null);
+    }
+  }
+
+  // Handle Buy Now (with Auth Gate)
+  async function handleBuyNowClick(e, listing) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!user) {
+      setAuthModalDetails({
+        title: 'Sign In to Buy Now',
+        message: `Sign in or create an account to instantly purchase "${listing.title}".`,
+      });
+      setShowAuthModal(true);
+      return;
+    }
+
+    if (listing.seller?._id === user.id || listing.seller?._id?.toString() === user.id) {
+      alert('You cannot purchase your own listing.');
+      return;
+    }
+
+    try {
+      await addToCart(listing._id, 1);
+      navigate('/checkout');
+    } catch (err) {
+      navigate(`/listing/${listing._id}`);
+    }
+  }
 
   return (
-    <div className="space-y-6">
-      {/* ── Gradient Hero Banner ── */}
-      <section className="rounded-2xl bg-gradient-to-br from-emerald-700 via-emerald-600 to-teal-500 px-6 py-10 text-white shadow-lg">
-        <div className="max-w-2xl">
-          <span className="inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-widest mb-3">♻️ Marketplace</span>
-          <h1 className="text-3xl font-extrabold tracking-tight md:text-4xl">
-            Buy &amp; Sell Recyclable Waste
+    <div className="space-y-6 pb-12">
+      {/* ── Cart Success Flash Alert ── */}
+      {cartSuccessNotice && (
+        <div className="fixed top-20 right-5 z-50 rounded-2xl bg-emerald-700 text-white p-4 shadow-2xl flex items-center justify-between gap-4 border border-emerald-500 animate-slide-in">
+          <div className="flex items-center gap-2.5 text-xs md:text-sm font-bold">
+            <span className="text-lg">✅</span>
+            <span>{cartSuccessNotice}</span>
+          </div>
+          <Link
+            to="/cart"
+            className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-extrabold shadow"
+          >
+            View Cart →
+          </Link>
+        </div>
+      )}
+
+      {/* ── Clean E-Commerce Hero Banner ── */}
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 p-6 md:p-8 text-white shadow-xl border border-slate-800">
+        <div className="relative z-10 max-w-2xl">
+          <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 border border-emerald-400/30 px-3 py-0.5 text-xs font-bold text-emerald-300 mb-2">
+            <span>CleanNect Recyclables Marketplace</span>
+          </div>
+          <h1 className="text-2xl md:text-4xl font-black tracking-tight leading-tight">
+            Buy & Sell Recyclable Waste at Real-Time Spot Rates.
           </h1>
-          <p className="mt-3 text-emerald-100 text-base">
-            Cleannect connects verified buyers and sellers of plastic, metal, paper, and more — turning waste into value.
+          <p className="mt-2 text-slate-300 text-xs md:text-sm leading-relaxed max-w-xl">
+            Browse verified scrap lots across India. Pick from plastics, high-grade metals, cardboard, and industrial waste ready for pickup.
           </p>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Link to="/auth/register" className="rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-50 transition shadow">
-              Start Selling Free
-            </Link>
-            <a href="#listings" className="rounded-xl border border-white/40 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition">
-              Browse Listings ↓
+
+          <div className="mt-4 flex items-center gap-3">
+            <a
+              href="#listings-grid"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2.5 text-xs transition shadow active:scale-95"
+            >
+              <span>Explore Active Lots ↓</span>
             </a>
+            <Link
+              to="/auth/register"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold px-4 py-2.5 text-xs border border-white/20 transition"
+            >
+              <span>Create Account Free</span>
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* ── Search & Filter ── */}
-      <section id="listings" className="card px-5 py-4">
-        {/* Search Bar */}
-        <div className="relative mb-4">
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-            <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+      {/* ── Amazon-Style 4-Quad Scrap Category Grid ── */}
+      <section className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* Quad 1: Plastics */}
+        <div
+          onClick={() => handleSelectCategory('plastic')}
+          className="group cursor-pointer rounded-2xl bg-white p-4 border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-500 transition-all flex flex-col justify-between"
+        >
+          <div>
+            <h3 className="font-extrabold text-slate-900 text-sm group-hover:text-emerald-700 transition">
+              Plastics (PET & HDPE)
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">Bottles, packaging, films</p>
+            <div className="mt-2.5 overflow-hidden rounded-xl h-28 bg-slate-100">
+              <img
+                src="https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=500&auto=format&fit=crop&q=80"
+                alt="Plastics"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+            </div>
           </div>
-          <input
-            type="text"
-            placeholder="Search listings by title or description…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="input-field pl-10 py-3 text-sm"
-          />
+          <span className="text-xs font-bold text-emerald-600 mt-2.5 block group-hover:underline">
+            View Plastics →
+          </span>
         </div>
 
-        {/* Category pill filters */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          <button onClick={() => setSelectedCategory('')} className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${!selectedCategory ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-200 text-slate-600 hover:border-emerald-300 hover:text-emerald-600'}`}>All</button>
-          {categories.map((cat) => (
-            <button key={cat} onClick={() => setSelectedCategory(cat === selectedCategory ? '' : cat)} className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize transition ${selectedCategory === cat ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-200 text-slate-600 hover:border-emerald-300 hover:text-emerald-600'}`}>{cat}</button>
+        {/* Quad 2: Scrap Metals */}
+        <div
+          onClick={() => handleSelectCategory('metal')}
+          className="group cursor-pointer rounded-2xl bg-white p-4 border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-500 transition-all flex flex-col justify-between"
+        >
+          <div>
+            <h3 className="font-extrabold text-slate-900 text-sm group-hover:text-emerald-700 transition">
+              Scrap Metals
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">Copper, brass, aluminum, iron</p>
+            <div className="mt-2.5 overflow-hidden rounded-xl h-28 bg-slate-100">
+              <img
+                src="https://images.unsplash.com/photo-1563245372-f21724e3856d?w=500&auto=format&fit=crop&q=80"
+                alt="Metals"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+            </div>
+          </div>
+          <span className="text-xs font-bold text-emerald-600 mt-2.5 block group-hover:underline">
+            View Metals →
+          </span>
+        </div>
+
+        {/* Quad 3: Cardboard & Paper */}
+        <div
+          onClick={() => handleSelectCategory('paper')}
+          className="group cursor-pointer rounded-2xl bg-white p-4 border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-500 transition-all flex flex-col justify-between"
+        >
+          <div>
+            <h3 className="font-extrabold text-slate-900 text-sm group-hover:text-emerald-700 transition">
+              Cardboard & Paper
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">Cartons, kraft sheets, office waste</p>
+            <div className="mt-2.5 overflow-hidden rounded-xl h-28 bg-slate-100">
+              <img
+                src="https://images.unsplash.com/photo-1607344645866-009c320c5ab8?w=500&auto=format&fit=crop&q=80"
+                alt="Paper & Cardboard"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+            </div>
+          </div>
+          <span className="text-xs font-bold text-emerald-600 mt-2.5 block group-hover:underline">
+            View Paper & Cartons →
+          </span>
+        </div>
+
+        {/* Quad 4: E-Waste */}
+        <div
+          onClick={() => handleSelectCategory('electronic')}
+          className="group cursor-pointer rounded-2xl bg-white p-4 border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-500 transition-all flex flex-col justify-between"
+        >
+          <div>
+            <h3 className="font-extrabold text-slate-900 text-sm group-hover:text-emerald-700 transition">
+              E-Waste & PCBs
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">Circuit boards, appliances, wires</p>
+            <div className="mt-2.5 overflow-hidden rounded-xl h-28 bg-slate-100">
+              <img
+                src="https://images.unsplash.com/photo-1597733336794-12d05021d510?w=500&auto=format&fit=crop&q=80"
+                alt="E-Waste"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+            </div>
+          </div>
+          <span className="text-xs font-bold text-emerald-600 mt-2.5 block group-hover:underline">
+            View E-Waste →
+          </span>
+        </div>
+      </section>
+
+      {/* ── Category Pill Bar & View Mode Toggle ── */}
+      <section id="listings-grid" className="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+        {/* Horizontal Category Slider */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto">
+          {categories.map((cat) => {
+            const isActive = selectedCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => handleSelectCategory(cat.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  isActive
+                    ? 'bg-slate-900 text-white shadow'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                <span>{cat.icon}</span>
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Sort & Grid/Map Mode */}
+        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+          <select
+            value={selectedSort}
+            onChange={(e) => setSelectedSort(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none"
+          >
+            {sortOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex items-center bg-slate-100 rounded-xl p-0.5 border border-slate-200">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                viewMode === 'grid' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+              }`}
+            >
+              ⊞ Grid
+            </button>
+            <button
+              onClick={() => setViewMode('map')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                viewMode === 'map' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+              }`}
+            >
+              🗺️ Map
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Main Product Marketplace Grid ── */}
+      {viewMode === 'map' ? (
+        <section className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm">
+          <div className="mb-3 px-2 flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700">
+              Showing {listings.length} waste listings on map
+            </span>
+            <span className="text-[11px] text-slate-400">Click any pin to inspect lot & purchase</span>
+          </div>
+          <Suspense fallback={<div className="h-64 flex items-center justify-center text-xs text-slate-400">Loading map...</div>}>
+            <MarketplaceMap listings={listings} height="320px" />
+          </Suspense>
+        </section>
+      ) : loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+            <div key={n} className="rounded-3xl bg-white p-4 border border-slate-200 space-y-3 animate-pulse">
+              <div className="h-44 rounded-2xl bg-slate-200" />
+              <div className="h-4 rounded bg-slate-200 w-3/4" />
+              <div className="h-3 rounded bg-slate-200 w-1/2" />
+              <div className="h-8 rounded-xl bg-slate-200 mt-4" />
+            </div>
           ))}
         </div>
-
-
-        {/* ── Filter row ── */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      ) : listings.length === 0 ? (
+        <div className="rounded-3xl bg-white p-12 text-center border border-slate-200 space-y-3">
+          <span className="text-4xl">📦</span>
+          <h3 className="text-lg font-bold text-slate-800">No listings found</h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            No active listings match your current filters. Try selecting "All Categories" or searching a different keyword.
+          </p>
           <button
-            type="button"
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition ${
-              showFilters || hasActiveFilters
-                ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
+            onClick={() => {
+              setSearchParams({});
+              setMinPrice('');
+              setMaxPrice('');
+              setCityFilter('');
+            }}
+            className="rounded-xl bg-emerald-600 text-white font-bold px-4 py-2 text-xs"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-            Filters
-            {hasActiveFilters && (
-              <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">
-                Active
-              </span>
-            )}
+            Clear All Filters
           </button>
-
-
-          <div className="flex items-center gap-2">
-            <label htmlFor="sort" className="text-sm font-medium text-slate-700">
-              Sort:
-            </label>
-            <select
-              id="sort"
-              value={`${sortBy}-${sortOrder}`}
-              onChange={(e) => {
-                const [field, order] = e.target.value.split('-');
-                setSortBy(field);
-                setSortOrder(order);
-              }}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              {sortOptions.map((option) => (
-                <option
-                  key={`${option.value}-${option.order}`}
-                  value={`${option.value}-${option.order}`}
-                >
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
+      ) : (
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {listings.map((item) => {
+            const isAvailable = item.status === 'available' && item.quantity > 0;
+            const isSellingFast = item.initialQuantity && item.quantity <= item.initialQuantity / 2;
+            const imgSrc = item.images?.[0] || getCategoryFallbackImage(item.category);
+            const isWish = isWishlisted(item._id);
 
-        {/* Filters Panel */}
-        {showFilters && (
-          <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {/* Category Filter */}
-              <div>
-                <label htmlFor="category" className="mb-1 block text-sm font-medium text-slate-700">
-                  Category
-                </label>
-                <select
-                  id="category"
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="">All Categories</option>
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Price Range */}
-              <div>
-                <label htmlFor="minPrice" className="mb-1 block text-sm font-medium text-slate-700">
-                  Min Price (₹)
-                </label>
-                <input
-                  type="number"
-                  id="minPrice"
-                  value={minPrice}
-                  onChange={(e) => setMinPrice(e.target.value)}
-                  placeholder="0"
-                  min="0"
-                  className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 placeholder-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="maxPrice" className="mb-1 block text-sm font-medium text-slate-700">
-                  Max Price (₹)
-                </label>
-                <input
-                  type="number"
-                  id="maxPrice"
-                  value={maxPrice}
-                  onChange={(e) => setMaxPrice(e.target.value)}
-                  placeholder="No limit"
-                  min="0"
-                  className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 placeholder-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              {/* Location Filters */}
-              <div>
-                <label htmlFor="city" className="mb-1 block text-sm font-medium text-slate-700">
-                  City
-                </label>
-                <input
-                  type="text"
-                  id="city"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="Enter city"
-                  className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 placeholder-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="state" className="mb-1 block text-sm font-medium text-slate-700">
-                  State
-                </label>
-                <input
-                  type="text"
-                  id="state"
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  placeholder="Enter state"
-                  className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 placeholder-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              {/* Clear Filters Button */}
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={handleClearFilters}
-                  disabled={!hasActiveFilters}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Clear All Filters
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Results Header */}
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-bold text-slate-900">Live Marketplace</h2>
-          <div className="flex items-center gap-2">
-            {!loading && listings.length > 0 && (
-              <p className="text-sm text-slate-400 mr-2">
-                {listings.length} listing{listings.length !== 1 ? 's' : ''}
-              </p>
-            )}
-            {/* List / Map toggle */}
-            <div className="flex rounded-xl border border-slate-200 overflow-hidden text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setViewMode('list')}
-                className={`px-3 py-1.5 transition ${
-                  viewMode === 'list' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
-                }`}
+            return (
+              <div
+                key={item._id}
+                className="group relative rounded-3xl bg-white p-4 border border-slate-200 hover:border-emerald-500 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
               >
-                ☰ List
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('map')}
-                className={`px-3 py-1.5 transition ${
-                  viewMode === 'map' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                🗺 Map
-              </button>
-            </div>
-          </div>
-        </div>
+                <div>
+                  {/* Image & Badges */}
+                  <div className="relative h-48 w-full overflow-hidden rounded-2xl bg-slate-100 mb-3">
+                    <img
+                      src={imgSrc}
+                      alt={item.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
 
-          {/* ── Map view ── */}
-          {viewMode === 'map' ? (
-            <Suspense fallback={<div className="skeleton rounded-2xl" style={{ height: 480 }} />}>
-              <MarketplaceMap listings={listings} height="480px" />
-            </Suspense>
-          ) : loading ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="rounded-2xl border border-slate-100 overflow-hidden">
-                  <div className="skeleton aspect-square" />
-                  <div className="p-3 space-y-2">
-                    <div className="skeleton h-4 w-3/4" />
-                    <div className="skeleton h-3 w-1/2" />
+                    {/* Choice / Selling Fast Badges */}
+                    <div className="absolute top-2.5 left-2.5 flex flex-col gap-1">
+                      {isSellingFast && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] uppercase shadow">
+                          ⚡ Selling Fast
+                        </span>
+                      )}
+                      <span className="px-2 py-0.5 rounded-full bg-slate-900/90 text-white font-bold text-[10px] uppercase backdrop-blur-md">
+                        {item.category}
+                      </span>
+                    </div>
+
+                    {/* Wishlist Button */}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleWishlist(item._id);
+                      }}
+                      className="absolute top-2.5 right-2.5 h-8 w-8 rounded-full bg-white/90 hover:bg-white text-slate-700 shadow-md flex items-center justify-center text-sm transition hover:scale-110"
+                      title="Save to Wishlist"
+                    >
+                      {isWish ? '❤️' : '🤍'}
+                    </button>
+
+                    {/* Location Badge */}
+                    {item.location?.city && (
+                      <div className="absolute bottom-2 left-2.5 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-lg text-white text-[10px] font-medium flex items-center gap-1">
+                        <span>📍</span>
+                        <span className="truncate max-w-[150px]">{item.location.city}</span>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-            </div>
-          ) : listings.length === 0 ? (
-            <div className="empty-state">
-              <p className="empty-state-icon">🔍</p>
-              <p className="font-semibold text-slate-700">
-                {hasActiveFilters ? 'No listings match your filters' : 'No listings yet'}
-              </p>
-              <p className="text-sm text-slate-400">{hasActiveFilters ? 'Try adjusting the search criteria.' : 'Be the first to create one.'}</p>
-              {hasActiveFilters && (
-                <button type="button" onClick={handleClearFilters} className="btn-secondary mt-2">
-                  Clear Filters
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {listings.map((listing) => {
-                const mainImage = listing.images && listing.images.length > 0 ? listing.images[0] : null;
-                return (
-                  <Link
-                    key={listing._id}
-                    to={`/listing/${listing._id}`}
-                    className="group card card-hover overflow-hidden"
-                  >
-                    {/* Image */}
-                    <div className="relative aspect-square w-full overflow-hidden bg-slate-100">
-                      <img
-                        src={mainImage || getCategoryFallbackImage(listing.category)}
-                        alt={listing.title}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        onError={(e) => { e.target.src = getCategoryFallbackImage(listing.category); }}
-                      />
-                      {/* Status badge */}
-                      {(() => {
-                        const { label, classes } = deriveListingStatus(listing);
-                        return (
-                          <div className="absolute top-2 right-2">
-                            <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold backdrop-blur-sm ${classes}`}>{label}</span>
-                          </div>
-                        );
-                      })()}
-                      {listing.category && (
-                        <div className="absolute top-2 left-2">
-                          <span className="rounded-full bg-white/85 px-2 py-0.5 text-[11px] font-semibold capitalize text-slate-700 backdrop-blur-sm">
-                            {listing.category}
-                          </span>
-                        </div>
+
+                  {/* Title & Seller */}
+                  <Link to={`/listing/${item._id}`}>
+                    <h3 className="font-bold text-slate-900 text-sm line-clamp-2 group-hover:text-emerald-700 transition leading-snug">
+                      {item.title}
+                    </h3>
+                  </Link>
+
+                  <div className="flex items-center gap-1.5 mt-1.5 text-xs text-slate-500">
+                    <span className="text-amber-500 font-bold">★ 4.9</span>
+                    <span className="text-[11px] text-slate-400">• Verified Seller</span>
+                  </div>
+
+                  {/* Stock Quantity Progress Bar */}
+                  <div className="mt-2.5">
+                    <div className="flex items-center justify-between text-[11px] font-semibold">
+                      <span className={item.quantity <= 10 ? 'text-rose-600 font-bold' : 'text-slate-600'}>
+                        {isAvailable ? `${item.quantity} ${item.unit} available` : 'Sold out'}
+                      </span>
+                      {item.initialQuantity && (
+                        <span className="text-slate-400 text-[10px]">
+                          Lot: {item.initialQuantity} {item.unit}
+                        </span>
                       )}
                     </div>
+                    {item.initialQuantity && (
+                      <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden">
+                        <div
+                          className="bg-emerald-500 h-full rounded-full"
+                          style={{
+                            width: `${Math.min(100, Math.max(5, (item.quantity / item.initialQuantity) * 100))}%`,
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
 
-                    {/* Info */}
-                    <div className="p-3">
-                      <h3 className="line-clamp-1 text-sm font-bold text-slate-900 group-hover:text-emerald-600 transition">
-                        {listing.title}
-                      </h3>
-                      <div className="mt-1 flex items-baseline gap-1">
-                        <span className="text-base font-extrabold text-emerald-600">₹{listing.price}</span>
-                        <span className="text-xs text-slate-400">/{listing.unit}</span>
-                      </div>
-                      <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
-                        <span>📦 {listing.quantity} {listing.unit}</span>
-                        {listing.location?.city && <span>📍 {listing.location.city}</span>}
-                      </div>
-                      <div className="mt-2.5 flex items-center justify-between border-t border-slate-50 pt-2.5">
-                        <span className="text-xs font-semibold text-emerald-600">View Details</span>
-                        <svg className="h-4 w-4 text-emerald-600 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    </div>
+                  {/* Pricing Box (Amazon style) */}
+                  <div className="mt-3 flex items-baseline gap-1.5">
+                    <span className="text-xl font-black text-slate-900">₹{item.price}</span>
+                    <span className="text-xs font-semibold text-slate-500">/ {item.unit}</span>
+                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded ml-auto">
+                      Spot Rate
+                    </span>
+                  </div>
+                </div>
+
+                {/* Amazon-Style Action Buttons */}
+                <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={(e) => handleAddToCartClick(e, item)}
+                      disabled={!isAvailable || addingCartId === item._id}
+                      className="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-bold text-xs transition shadow-sm disabled:opacity-40"
+                    >
+                      {addingCartId === item._id ? 'Adding...' : 'Add to Cart'}
+                    </button>
+
+                    <button
+                      onClick={(e) => handleBuyNowClick(e, item)}
+                      disabled={!isAvailable}
+                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs transition shadow-sm disabled:opacity-40"
+                    >
+                      Buy Now
+                    </button>
+                  </div>
+
+                  <Link
+                    to={`/listing/${item._id}`}
+                    className="w-full block text-center py-1 text-[11px] font-bold text-slate-600 hover:text-emerald-700 transition"
+                  >
+                    View Details & Reviews →
                   </Link>
-                );
-              })}
-            </div>
-          )}
-      </section>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
+      {/* ── Global Auth Prompt Modal (For Guests) ── */}
+      <AuthPromptModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        title={authModalDetails.title}
+        message={authModalDetails.message}
+      />
     </div>
   );
 }
-
-export default LandingPage;
-
-
-
-
-
-

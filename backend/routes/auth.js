@@ -28,17 +28,27 @@ router.get('/me', protect, getMe);
 // @desc    Initiate Google OAuth flow
 router.get(
   '/google',
-  passport.authenticate('google', { scope: ['profile', 'email'], session: false })
+  (req, res, next) => {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/login?error=oauth_unconfigured`);
+    }
+    passport.authenticate('google', { scope: ['profile', 'email'], session: false })(req, res, next);
+  }
 );
 
 // @route   GET /api/auth/google/callback
 // @desc    Google OAuth callback — redirects to frontend with JWT token
 router.get(
   '/google/callback',
-  passport.authenticate('google', {
-    failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/login?error=oauth_failed`,
-    session: false,
-  }),
+  (req, res, next) => {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/login?error=oauth_unconfigured`);
+    }
+    passport.authenticate('google', {
+      failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/login?error=oauth_failed`,
+      session: false,
+    })(req, res, next);
+  },
   googleCallback
 );
 
