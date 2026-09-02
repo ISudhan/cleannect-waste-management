@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const passport = require('passport');
 require('dotenv').config();
+console.log('Gemini key loaded:', !!process.env.GEMINI_API_KEY);
 const connectDB = require('./config/database');
 const jwt = require('jsonwebtoken');
 const User = require('./models/User');
@@ -169,6 +170,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/route-optimizer', routeOptimizerRoutes);
 app.use('/api/gemini', geminiRoutes);
+app.use('/api/chat', geminiRoutes);
 
 // 404 handler
 app.use((req, res) => {

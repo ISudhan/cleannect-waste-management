@@ -242,8 +242,33 @@ exports.optimizeRoute = async (req, res) => {
     const fuelSavedLiters = Math.round(result.kmSaved * 0.11 * 10) / 10;
     const co2SavedKg = Math.round(fuelSavedLiters * 2.68 * 10) / 10;
     const costSavedInr = Math.round(fuelSavedLiters * 95);
+    const totalWasteQuantity = validStops.reduce((sum, s) => sum + (parseFloat(s.quantity) || 0), 0);
+    const vehicleCapacity = 500;
+    const capacityUtil = Math.min(100, Math.round((totalWasteQuantity / vehicleCapacity) * 100));
 
     const navigationUrl = generateGoogleMapsUrl(depot, result.optimizedStops);
+
+    // Formatted Human-Readable Route Explanation
+    const aiExplanation = `Route:
+Vehicle: CleanNect EV Van 01
+Start: ${depot.address || 'Regional Depot'}
+Stops:
+${result.optimizedStops
+  .map(
+    (stop, i) =>
+      `${i + 1}. ${stop.name || 'Member'} (${stop.address}) — ${stop.wasteType || 'Scrap'} [${stop.quantity} ${stop.unit || 'kg'}]`
+  )
+  .join('\n')}
+End: ${depot.address || 'Regional Depot'}
+
+Total estimated distance: ${result.optimizedDistance} km
+Total estimated time: ${accumulatedMinutes} minutes
+Estimated collected waste: ${totalWasteQuantity} kg
+Vehicle capacity: ${vehicleCapacity} kg
+Capacity utilization: ${capacityUtil}%
+
+Optimization reason:
+Sequenced using Nearest-Neighbor & 2-Opt TSP algorithms to minimize travel distance, saving ${result.kmSaved} km (${result.percentSaved}%) and ${co2SavedKg} kg of CO₂ emissions compared to unorganized collection.`;
 
     return res.status(200).json({
       success: true,
@@ -264,8 +289,11 @@ exports.optimizeRoute = async (req, res) => {
           fuelSavedLiters,
           co2SavedKg,
           costSavedInr,
-          totalWasteQuantity: validStops.reduce((sum, s) => sum + (parseFloat(s.quantity) || 0), 0),
+          totalWasteQuantity,
+          vehicleCapacity,
+          capacityUtilizationPercent: capacityUtil,
         },
+        aiExplanation,
         navigationUrl,
       },
     });
@@ -292,19 +320,40 @@ exports.getMarketplaceStops = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(20);
 
+    const cityCoords = {
+      bengaluru: { lat: 12.9716, lng: 77.5946 },
+      bangalore: { lat: 12.9716, lng: 77.5946 },
+      mumbai: { lat: 19.0760, lng: 72.8777 },
+      delhi: { lat: 28.6139, lng: 77.2090 },
+      chennai: { lat: 13.0827, lng: 80.2707 },
+      hyderabad: { lat: 17.3850, lng: 78.4867 },
+      pune: { lat: 18.5204, lng: 73.8567 },
+      kolkata: { lat: 22.5726, lng: 88.3639 },
+      ahmedabad: { lat: 23.0225, lng: 72.5714 },
+    };
+
     let stops = listings.map((item, idx) => {
       const loc = item.location || {};
-      const defaultLat = 12.9716 + ((idx % 5) - 2) * 0.025;
-      const defaultLng = 77.5946 + ((idx % 4) - 1.5) * 0.028;
+      const cityName = (loc.city || '').toLowerCase().trim();
+      const baseCoords = cityCoords[cityName] || { lat: 12.9716, lng: 77.5946 };
+
+      const lat = loc.lat && !isNaN(loc.lat)
+        ? Number(loc.lat)
+        : baseCoords.lat + (((idx % 5) - 2) * 0.022);
+      const lng = loc.lng && !isNaN(loc.lng)
+        ? Number(loc.lng)
+        : baseCoords.lng + (((idx % 4) - 1.5) * 0.025);
+
+      const addressStr = [loc.street, loc.city, loc.state].filter(Boolean).join(', ') || 'Pickup Location';
 
       return {
-        id: item._id,
-        listingId: item._id,
+        id: item._id.toString(),
+        listingId: item._id.toString(),
         name: item.seller?.name || `Seller ${idx + 1}`,
-        phone: item.seller?.phone || 'Verified on booking',
-        address: [loc.city, loc.state].filter(Boolean).join(', ') || 'Pickup Location',
-        lat: loc.lat || defaultLat,
-        lng: loc.lng || defaultLng,
+        phone: item.seller?.phone || '+91 98000 00000',
+        address: addressStr,
+        lat: Number(lat.toFixed(5)),
+        lng: Number(lng.toFixed(5)),
         wasteType: item.title,
         category: item.category,
         quantity: item.quantity,

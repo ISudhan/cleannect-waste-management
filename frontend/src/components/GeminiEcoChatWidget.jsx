@@ -10,17 +10,11 @@ const samplePrompts = [
 
 export default function GeminiEcoChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      id: 'welcome',
-      sender: 'bot',
-      text: "👋 Hi! I'm **CleanNect AI**, powered by Google Gemini. Ask me anything about turning **Wealth out of Waste**, real-time scrap prices, or optimizing your collection routes! You can also attach a waste photo 📸.",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [attachedImageBase64, setAttachedImageBase64] = useState(null);
+  const [attachedImageMimeType, setAttachedImageMimeType] = useState('image/jpeg');
   const [attachedImagePreview, setAttachedImagePreview] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -31,14 +25,24 @@ export default function GeminiEcoChatWidget() {
     }
   }, [messages, isOpen]);
 
-  // Handle Image attachment in chat
+  // Handle Image attachment in chat (clean raw base64 extraction)
   function handleImageSelect(e) {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 20 * 1024 * 1024) {
+        alert('Please select an image smaller than 20MB.');
+        return;
+      }
+      setAttachedImageMimeType(file.type || 'image/jpeg');
       const reader = new FileReader();
       reader.onloadend = () => {
-        setAttachedImageBase64(reader.result);
-        setAttachedImagePreview(reader.result);
+        const fullDataUrl = reader.result;
+        setAttachedImagePreview(fullDataUrl);
+        // Strip data:...;base64, prefix for clean API transmission
+        const base64Data = fullDataUrl.includes(';base64,')
+          ? fullDataUrl.split(';base64,')[1]
+          : fullDataUrl;
+        setAttachedImageBase64(base64Data);
       };
       reader.readAsDataURL(file);
     }
@@ -47,6 +51,7 @@ export default function GeminiEcoChatWidget() {
   function removeAttachedImage() {
     setAttachedImageBase64(null);
     setAttachedImagePreview(null);
+    setAttachedImageMimeType('image/jpeg');
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -54,6 +59,7 @@ export default function GeminiEcoChatWidget() {
   async function handleSendMessage(customPrompt = null) {
     const textToSend = customPrompt || inputText;
     if ((!textToSend || !textToSend.trim()) && !attachedImageBase64) return;
+    if (sending) return;
 
     const userMsg = {
       id: `user-${Date.now()}`,
@@ -66,26 +72,28 @@ export default function GeminiEcoChatWidget() {
     setMessages((prev) => [...prev, userMsg]);
     setInputText('');
     const imageToSend = attachedImageBase64;
+    const mimeToSend = attachedImageMimeType;
     removeAttachedImage();
     setSending(true);
 
     try {
-      // Build conversation history format
-      const history = messages.map((m) => ({
-        sender: m.sender,
-        text: m.text,
+      // Build safe conversation history (last 6 messages)
+      const history = messages.slice(-6).map((m) => ({
+        sender: m.sender === 'user' ? 'user' : 'model',
+        text: m.text || '',
       }));
 
       const res = await apiClient.post('/gemini/chat', {
         message: textToSend,
         history,
         imageBase64: imageToSend,
+        mimeType: mimeToSend,
       });
 
-      if (res.data?.success) {
-        const fullText = res.data.data.reply || '';
+      const fullText = res.data?.answer || res.data?.data?.reply;
+      if (res.data?.success && fullText) {
         const botId = `bot-${Date.now()}`;
-        
+
         // Initialize empty bot message
         setMessages((prev) => [
           ...prev,
@@ -114,15 +122,20 @@ export default function GeminiEcoChatWidget() {
           } else {
             clearInterval(streamInterval);
           }
-        }, 20);
+        }, 15);
         return;
+      } else {
+        throw new Error('Invalid response from Gemini');
       }
     } catch (err) {
       console.error('Chat error:', err);
       const errMsg = {
         id: `err-${Date.now()}`,
         sender: 'bot',
-        text: "🌿 **CleanNect AI:** I am ready! Ask me about scrap prices, route savings, or attach a waste image 📸.",
+        text:
+          err.response?.data?.error ||
+          err.response?.data?.message ||
+          '⚠️ AI service is temporarily unavailable. Please try again.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errMsg]);
@@ -135,7 +148,7 @@ export default function GeminiEcoChatWidget() {
     <div className="fixed bottom-5 right-5 z-50">
       {/* ── Chat Window Modal ── */}
       {isOpen ? (
-        <div className="flex flex-col w-[360px] md:w-[400px] h-[540px] max-h-[85vh] bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
+        <div className="flex flex-col w-[360px] md:w-[410px] h-[540px] max-h-[85vh] bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-slate-900 via-emerald-950 to-teal-900 text-white shadow-md">
             <div className="flex items-center gap-2.5">
@@ -148,7 +161,7 @@ export default function GeminiEcoChatWidget() {
                   CleanNect AI Eco-Bot
                 </h3>
                 <p className="text-[10px] text-emerald-300 font-medium">
-                  Real-time Gemini Wealth out of Waste
+                  Real-time Gemini 3.6 Flash
                 </p>
               </div>
             </div>
@@ -165,6 +178,17 @@ export default function GeminiEcoChatWidget() {
 
           {/* Messages Feed */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
+            {messages.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-2 text-slate-400 my-auto">
+                <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl font-black shadow-sm">
+                  ✨
+                </div>
+                <p className="text-xs font-bold text-slate-800">CleanNect Gemini AI is Ready</p>
+                <p className="text-[11px] text-slate-500 max-w-[240px]">
+                  Ask about waste segregation, recycling rates, Wealth out of Waste blueprints, or attach a photo 📸.
+                </p>
+              </div>
+            )}
             {messages.map((m) => {
               const isUser = m.sender === 'user';
               return (
@@ -188,10 +212,12 @@ export default function GeminiEcoChatWidget() {
                     )}
                     <div className="whitespace-pre-wrap font-sans space-y-1">
                       {m.text.split('\n').map((line, lIdx) => {
-                        // Highlight bold tokens **text**
                         const parts = line.split(/(\*\*.*?\*\*)/g);
                         return (
-                          <p key={lIdx} className={line.startsWith('•') || line.startsWith('-') ? 'pl-2' : ''}>
+                          <p
+                            key={lIdx}
+                            className={line.startsWith('•') || line.startsWith('-') ? 'pl-2' : ''}
+                          >
                             {parts.map((part, pIdx) => {
                               if (part.startsWith('**') && part.endsWith('**')) {
                                 return (
@@ -321,7 +347,7 @@ export default function GeminiEcoChatWidget() {
           </div>
           <div className="text-left hidden sm:block">
             <p className="text-xs font-bold leading-tight">Wealth out of Waste</p>
-            <p className="text-[10px] text-emerald-400 font-medium">Gemini AI Assistant</p>
+            <p className="text-[10px] text-emerald-400 font-medium">Gemini 3.6 AI</p>
           </div>
         </button>
       )}

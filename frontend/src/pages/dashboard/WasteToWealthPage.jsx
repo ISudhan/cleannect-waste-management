@@ -2,696 +2,1189 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../lib/apiClient';
 
-// Sample demo waste items for instant 1-click testing
+// ---------------------------------------------------------
+// Demo waste items
+// ---------------------------------------------------------
 const sampleWasteItems = [
   {
     id: 'sample-plastic',
     name: 'PET Plastic Bottles',
     category: 'plastic',
-    image: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=500&auto=format&fit=crop&q=80',
-    notes: 'Clean transparent plastic bottles and milk jugs, approximately 5kg batch.',
+    image:
+      'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=500&auto=format&fit=crop&q=80',
+    notes:
+      'Clean transparent PET plastic bottles and milk jugs, approximately 5kg batch.',
   },
   {
     id: 'sample-metal',
     name: 'Copper & Aluminum Scrap',
     category: 'metal',
-    image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=500&auto=format&fit=crop&q=80',
-    notes: 'Stripped electrical copper wiring and soda beverage cans.',
+    image:
+      'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=500&auto=format&fit=crop&q=80',
+    notes:
+      'Stripped electrical copper wiring and aluminum beverage cans.',
   },
   {
     id: 'sample-paper',
     name: 'Corrugated Cardboard Box',
     category: 'paper',
-    image: 'https://images.unsplash.com/photo-1607344645866-009c320c5ab8?w=500&auto=format&fit=crop&q=80',
-    notes: 'Heavy duty packaging delivery cartons and newspapers.',
+    image:
+      'https://images.unsplash.com/photo-1607344645866-009c320c5ab8?w=500&auto=format&fit=crop&q=80',
+    notes:
+      'Heavy-duty packaging delivery cartons and newspapers.',
   },
   {
     id: 'sample-ewaste',
     name: 'Computer Circuit Boards & Cables',
     category: 'electronic',
-    image: 'https://images.unsplash.com/photo-1597733336794-12d05021d510?w=500&auto=format&fit=crop&q=80',
-    notes: 'Defunct motherboard, RAM sticks, and connector cables.',
+    image:
+      'https://images.unsplash.com/photo-1597733336794-12d05021d510?w=500&auto=format&fit=crop&q=80',
+    notes:
+      'Defunct motherboard, RAM sticks, connector cables and electronic components.',
   },
 ];
 
+// ---------------------------------------------------------
+// Analysis progress messages
+// ---------------------------------------------------------
 const analysisSteps = [
-  '📸 Ingesting & normalizing multi-modal image tensor...',
-  '🔬 Scanning polymer structure & chemical composition...',
-  '📊 Querying live Indian scrap market price indices (INR ₹)...',
-  '💡 Formulating DIY blueprints & industrial valorization pathways...',
-  '🌿 Finalizing carbon offset & circular economy metrics...',
+  '📸 Processing the waste image...',
+  '🔬 Identifying material and condition...',
+  '📊 Estimating indicative scrap value...',
+  '💡 Generating DIY upcycling ideas...',
+  '🏭 Generating industrial recycling pathways...',
+  '🌿 Calculating environmental impact...',
 ];
+
+// ---------------------------------------------------------
+// Helper: safely convert API values to arrays
+// ---------------------------------------------------------
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+// ---------------------------------------------------------
+// Helper: extract analysis object regardless of slight
+// differences in backend response structure
+// ---------------------------------------------------------
+function extractAnalysisResponse(response) {
+  const payload = response?.data;
+
+  if (!payload?.success) {
+    return null;
+  }
+
+  // Possible structures:
+  // { success: true, data: {...} }
+  // { success: true, data: { analysis: {...} } }
+  // { success: true, analysis: {...} }
+
+  return (
+    payload?.data?.analysis ||
+    payload?.data ||
+    payload?.analysis ||
+    null
+  );
+}
 
 export default function WasteToWealthPage() {
   const navigate = useNavigate();
+
+  // -------------------------------------------------------
+  // State
+  // -------------------------------------------------------
   const [selectedImage, setSelectedImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [notes, setNotes] = useState('');
+
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisStepIndex, setAnalysisStepIndex] = useState(0);
   const [analysisResult, setAnalysisResult] = useState(null);
-  const [activeTab, setActiveTab] = useState('diy'); // 'diy' | 'industrial' | 'valuation' | 'calculator'
+
+  const [activeTab, setActiveTab] = useState('diy');
+
   const [calcWeightKg, setCalcWeightKg] = useState(25);
+
   const [error, setError] = useState(null);
 
-  // Animate progress steps during analysis
+  // -------------------------------------------------------
+  // Animate analysis progress
+  // -------------------------------------------------------
   useEffect(() => {
-    let interval = null;
-    if (analyzing) {
-      setAnalysisStepIndex(0);
-      interval = setInterval(() => {
-        setAnalysisStepIndex((prev) => (prev + 1) % analysisSteps.length);
-      }, 750);
-    } else {
-      if (interval) clearInterval(interval);
+    if (!analyzing) {
+      return undefined;
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+
+    setAnalysisStepIndex(0);
+
+    const interval = setInterval(() => {
+      setAnalysisStepIndex((prev) => {
+        if (prev >= analysisSteps.length - 1) {
+          return 0;
+        }
+
+        return prev + 1;
+      });
+    }, 900);
+
+    return () => clearInterval(interval);
   }, [analyzing]);
 
-  // Handle file upload selection
-  function handleFileChange(e) {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedImage(file);
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-      setAnalysisResult(null);
-      setError(null);
+  // -------------------------------------------------------
+  // Cleanup object URLs
+  // -------------------------------------------------------
+  useEffect(() => {
+    return () => {
+      if (previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  // -------------------------------------------------------
+  // File upload
+  // -------------------------------------------------------
+  function handleFileChange(event) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
     }
+
+    // Basic validation
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file.');
+      return;
+    }
+
+    // 10 MB maximum
+    const maxSize = 10 * 1024 * 1024;
+
+    if (file.size > maxSize) {
+      setError('Image size must be less than 10MB.');
+      return;
+    }
+
+    // Revoke previous object URL
+    if (previewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    const url = URL.createObjectURL(file);
+
+    setSelectedImage(file);
+    setPreviewUrl(url);
+    setAnalysisResult(null);
+    setError(null);
+    setActiveTab('diy');
   }
 
-  // Handle Sample Item Selection
+  // -------------------------------------------------------
+  // Sample item selection
+  // -------------------------------------------------------
   function handleSelectSample(sample) {
     setPreviewUrl(sample.image);
     setSelectedImage(null);
     setNotes(sample.notes);
     setAnalysisResult(null);
     setError(null);
+    setActiveTab('diy');
+
+    // Automatically analyze sample
     triggerAnalysisWithNotes(sample.notes, sample.name);
   }
 
-  // Trigger Gemini Analysis
-  async function handleAnalyze(e) {
-    if (e) e.preventDefault();
+  // -------------------------------------------------------
+  // Analyze uploaded image
+  // -------------------------------------------------------
+  async function handleAnalyze(event) {
+    event?.preventDefault();
+
     if (!selectedImage && !previewUrl) {
-      setError('Please upload an image or choose a sample waste item.');
+      setError(
+        'Please upload an image or choose a sample waste item.'
+      );
       return;
     }
 
     setAnalyzing(true);
     setError(null);
+    setAnalysisResult(null);
 
     try {
+      let response;
+
       if (selectedImage) {
-        // Send as FormData
+        // -----------------------------------------------
+        // Real uploaded image
+        // -----------------------------------------------
         const formData = new FormData();
+
         formData.append('image', selectedImage);
-        formData.append('notes', notes);
+        formData.append('notes', notes || '');
 
-        const res = await apiClient.post('/gemini/analyze-waste', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-
-        if (res.data?.success) {
-          setAnalysisResult(res.data.data);
-        }
+        // IMPORTANT:
+        // Do NOT manually set Content-Type here.
+        // Axios/browser will automatically add the multipart
+        // boundary.
+        response = await apiClient.post(
+          '/gemini/analyze-waste',
+          formData
+        );
       } else {
-        // Sample item query
-        const res = await apiClient.post('/gemini/analyze-waste', {
-          notes: `${notes} (Item photo sample provided)`,
-        });
-
-        if (res.data?.success) {
-          setAnalysisResult(res.data.data);
-        }
+        // -----------------------------------------------
+        // Sample image
+        // -----------------------------------------------
+        response = await apiClient.post(
+          '/gemini/analyze-waste',
+          {
+            notes: `${notes || ''} (This is a demo sample waste item.)`,
+          }
+        );
       }
+
+      const result = extractAnalysisResponse(response);
+
+      if (!result) {
+        throw new Error(
+          response?.data?.message ||
+          response?.data?.error ||
+          'Gemini returned an invalid analysis response.'
+        );
+      }
+
+      setAnalysisResult(result);
+      setActiveTab('diy');
     } catch (err) {
-      console.error('Analysis error:', err);
-      setError(err.response?.data?.message || 'Failed to analyze waste item. Please try again.');
+      console.error('Waste analysis error:', err);
+
+      setError(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Failed to analyze waste item. Please try again.'
+      );
     } finally {
       setAnalyzing(false);
     }
   }
 
-  // Quick helper for sample direct trigger
+  // -------------------------------------------------------
+  // Analyze demo sample
+  // -------------------------------------------------------
   async function triggerAnalysisWithNotes(sampleNotes, sampleName) {
     setAnalyzing(true);
+    setError(null);
+    setAnalysisResult(null);
+
     try {
-      const res = await apiClient.post('/gemini/analyze-waste', {
-        notes: `${sampleName}: ${sampleNotes}`,
-      });
-      if (res.data?.success) {
-        setAnalysisResult(res.data.data);
+      const response = await apiClient.post(
+        '/gemini/analyze-waste',
+        {
+          notes: `${sampleName}: ${sampleNotes}. This is a demo sample image.`,
+        }
+      );
+
+      const result = extractAnalysisResponse(response);
+
+      if (!result) {
+        throw new Error(
+          response?.data?.message ||
+          response?.data?.error ||
+          'Gemini returned an invalid analysis response.'
+        );
       }
+
+      setAnalysisResult(result);
+      setActiveTab('diy');
     } catch (err) {
-      console.error(err);
+      console.error('Sample analysis error:', err);
+
+      setError(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Failed to analyze sample item.'
+      );
     } finally {
       setAnalyzing(false);
     }
   }
 
-  // Navigate to create listing with pre-filled fields
+  // -------------------------------------------------------
+  // Create marketplace listing
+  // -------------------------------------------------------
   function handleCreateListingFromAnalysis() {
-    if (!analysisResult?.wealthOutOfWaste?.quickListing) return;
-    const item = analysisResult.wealthOutOfWaste.quickListing;
-    sessionStorage.setItem('prefill_listing', JSON.stringify({
-      title: item.title,
-      description: item.description,
+    const item = analysisResult?.wealthOutOfWaste?.quickListing;
+
+    if (!item) {
+      setError('No marketplace listing data was generated.');
+      return;
+    }
+
+    const prefillListing = {
+      title: item.title || 'Recyclable Waste Material',
+
+      description:
+        item.description ||
+        'Recyclable waste material identified by CleanNect AI.',
+
       category: item.category || 'other',
-      price: item.suggestedPrice || 25,
+
+      price: Number(item.suggestedPrice) || 25,
+
       unit: item.unit || 'kg',
-      quantity: calcWeightKg || 10,
-    }));
+
+      quantity: Number(calcWeightKg) || 10,
+    };
+
+    sessionStorage.setItem(
+      'prefill_listing',
+      JSON.stringify(prefillListing)
+    );
+
     navigate('/dashboard/listings/new');
   }
 
-  const classification = analysisResult?.wasteClassification;
-  const wow = analysisResult?.wealthOutOfWaste;
+  // -------------------------------------------------------
+  // Analysis data
+  // -------------------------------------------------------
+  const classification =
+    analysisResult?.wasteClassification || {};
 
-  // Real-time live calculator metrics
-  const minPrice = wow?.scrapValuation?.estimatedPricePerKgMin || 15;
-  const maxPrice = wow?.scrapValuation?.estimatedPricePerKgMax || 30;
-  const avgPrice = Math.round((minPrice + maxPrice) / 2);
-  const totalEstimatedEarnings = Math.round(calcWeightKg * avgPrice);
-  const totalCo2Offset = (calcWeightKg * (wow?.environmentalImpact?.co2OffsetKgPerKg || 1.8)).toFixed(1);
+  const wow =
+    analysisResult?.wealthOutOfWaste || {};
 
+  const industrialRecycling =
+    wow?.industrialRecycling || {};
+
+  const scrapValuation =
+    wow?.scrapValuation || {};
+
+  const environmentalImpact =
+    wow?.environmentalImpact || {};
+
+  const diyProjects =
+    safeArray(wow?.diyUpcycling);
+
+  const safetyTips =
+    safeArray(wow?.safetyAndPrep);
+
+  const endProducts =
+    safeArray(industrialRecycling?.endProducts);
+
+  // -------------------------------------------------------
+  // Calculator
+  // -------------------------------------------------------
+  const minPrice =
+    Number(scrapValuation?.estimatedPricePerKgMin) || 15;
+
+  const maxPrice =
+    Number(scrapValuation?.estimatedPricePerKgMax) || 30;
+
+  const avgPrice =
+    Math.round((minPrice + maxPrice) / 2);
+
+  const totalEstimatedEarnings =
+    Math.round(calcWeightKg * avgPrice);
+
+  const co2PerKg =
+    Number(environmentalImpact?.co2OffsetKgPerKg) || 1.8;
+
+  const totalCo2Offset =
+    (calcWeightKg * co2PerKg).toFixed(1);
+
+  // -------------------------------------------------------
+  // Render
+  // -------------------------------------------------------
   return (
     <div className="space-y-6 pb-12">
-      {/* ── Top Hero Banner ── */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-emerald-950 to-teal-950 p-6 md:p-10 text-white shadow-2xl">
-        <div className="absolute -top-16 -right-16 h-72 w-72 rounded-full bg-emerald-500/20 blur-3xl pointer-events-none" />
+
+      {/* =====================================================
+          HERO
+      ====================================================== */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-emerald-950 to-teal-950 p-6 text-white shadow-2xl md:p-10">
+
+        <div className="pointer-events-none absolute -right-16 -top-16 h-72 w-72 rounded-full bg-emerald-500/20 blur-3xl" />
+
         <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 border border-emerald-400/30 px-3.5 py-1 text-xs font-bold text-emerald-300 mb-4 backdrop-blur-md">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/20 px-3.5 py-1 text-xs font-bold text-emerald-300 backdrop-blur-md">
+
+            <span className="h-2 w-2 animate-ping rounded-full bg-emerald-400" />
+
             <span>Google Gemini Multimodal AI</span>
+
             <span>•</span>
-            <span>Real-Time Waste Valorization</span>
+
+            <span>Waste Valorization</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
+
+          <h1 className="text-3xl font-extrabold leading-tight tracking-tight md:text-4xl">
             Wealth out of Waste (WoW) Studio
           </h1>
-          <p className="mt-3 text-slate-300 text-sm md:text-base leading-relaxed">
-            Upload any photo of garbage or discarded material. CleanNect's Gemini AI will instantly identify the composition, evaluate scrap market valuation, generate DIY upcycling blueprints, and formulate industrial recycling pathways.
+
+          <p className="mt-3 text-sm leading-relaxed text-slate-300 md:text-base">
+            Upload a photo of discarded material. CleanNect AI identifies
+            the material, estimates indicative scrap value, generates
+            upcycling ideas, and suggests industrial recycling pathways.
           </p>
+
         </div>
       </div>
 
-      {/* ── Main Layout: Uploader & Analysis Output ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Upload & Sample Selector */}
-        <div className="lg:col-span-5 space-y-5">
-          <div className="rounded-3xl bg-white p-6 border border-slate-200 shadow-sm space-y-4">
-            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+      {/* =====================================================
+          MAIN GRID
+      ====================================================== */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+
+        {/* ===================================================
+            LEFT COLUMN
+        ==================================================== */}
+        <div className="space-y-5 lg:col-span-5">
+
+          {/* Upload card */}
+          <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+
+            <h2 className="flex items-center gap-2 text-base font-bold text-slate-900">
               <span>📸</span>
               <span>Upload Waste Photo for AI Inspection</span>
             </h2>
 
-            {/* Dropzone / Preview Area */}
-            <label className="relative flex flex-col items-center justify-center min-h-[220px] rounded-2xl border-2 border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50/70 hover:bg-emerald-50/30 transition-all cursor-pointer overflow-hidden p-4 group">
+            {/* Dropzone */}
+            <label className="group relative flex min-h-[220px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/70 p-4 transition-all hover:border-emerald-500 hover:bg-emerald-50/30">
+
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/jpg"
                 onChange={handleFileChange}
                 className="hidden"
               />
 
               {previewUrl ? (
-                <div className="relative w-full h-48 rounded-xl overflow-hidden shadow-inner">
+                <div className="relative h-48 w-full overflow-hidden rounded-xl shadow-inner">
+
                   <img
                     src={previewUrl}
                     alt="Waste preview"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
-                    <span>🔄 Click to replace photo</span>
+
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-bold text-white opacity-0 transition-opacity group-hover:opacity-100">
+                    🔄 Click to replace photo
                   </div>
+
                 </div>
               ) : (
-                <div className="flex flex-col items-center text-center p-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 text-2xl mb-2 group-hover:scale-110 transition-transform">
+                <div className="flex flex-col items-center p-4 text-center">
+
+                  <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-2xl text-emerald-700 transition-transform group-hover:scale-110">
                     📤
                   </div>
+
                   <p className="text-sm font-bold text-slate-700">
                     Click to browse or drag & drop photo
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Supports JPG, PNG, WEBP (Max 10MB)
+
+                  <p className="mt-1 text-xs text-slate-400">
+                    Supports JPG, PNG, WEBP — Max 10MB
                   </p>
+
                 </div>
               )}
+
             </label>
 
-            {/* Optional Description / Quantity */}
+            {/* Notes */}
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">
-                Context Notes & Estimated Weight (Optional)
+
+              <label className="mb-1 block text-xs font-bold text-slate-600">
+                Context Notes & Estimated Weight
               </label>
+
               <input
                 type="text"
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(event) =>
+                  setNotes(event.target.value)
+                }
                 placeholder="e.g. 10kg clean water bottles with caps"
-                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none"
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-800 outline-none placeholder:text-slate-400 focus:border-emerald-500"
               />
+
             </div>
 
+            {/* Error */}
             {error && (
-              <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 font-medium">
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-medium text-rose-700">
                 ⚠️ {error}
               </div>
             )}
 
-            {/* Analyze Button */}
+            {/* Analyze */}
             <button
+              type="button"
               onClick={handleAnalyze}
-              disabled={analyzing || (!selectedImage && !previewUrl)}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 text-sm transition-all shadow-lg hover:shadow-emerald-600/25 active:scale-95 disabled:opacity-50"
+              disabled={
+                analyzing ||
+                (!selectedImage && !previewUrl)
+              }
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3.5 text-sm font-bold text-white shadow-lg transition-all hover:bg-emerald-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {analyzing ? (
                 <>
                   <span className="spinner h-4 w-4 border-white" />
-                  <span>Gemini Inspecting in Real Time...</span>
+                  <span>Gemini Inspecting...</span>
                 </>
               ) : (
                 <>
-                  <span>✨ Inspect & Generate Wealth Ideas</span>
+                  <span>✨</span>
+                  <span>Inspect & Generate Wealth Ideas</span>
                 </>
               )}
             </button>
+
           </div>
 
-          {/* Quick Demo Sample Picker */}
-          <div className="rounded-3xl bg-white p-5 border border-slate-200 shadow-sm space-y-3">
+          {/* Sample picker */}
+          <div className="space-y-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Or Try Quick Sample Photos:
+                Or Try Quick Sample Photos
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
+
               {sampleWasteItems.map((sample) => (
                 <button
+                  type="button"
                   key={sample.id}
-                  onClick={() => handleSelectSample(sample)}
-                  className="flex items-center gap-2.5 p-2 rounded-2xl border border-slate-100 bg-slate-50 hover:bg-emerald-50/60 hover:border-emerald-200 text-left transition-all group"
+                  onClick={() =>
+                    handleSelectSample(sample)
+                  }
+                  disabled={analyzing}
+                  className="group flex items-center gap-2.5 rounded-2xl border border-slate-100 bg-slate-50 p-2 text-left transition-all hover:border-emerald-200 hover:bg-emerald-50/60 disabled:cursor-not-allowed disabled:opacity-60"
                 >
+
                   <img
                     src={sample.image}
                     alt={sample.name}
-                    className="h-10 w-10 rounded-xl object-cover flex-shrink-0 group-hover:scale-105 transition"
+                    className="h-10 w-10 flex-shrink-0 rounded-xl object-cover transition group-hover:scale-105"
                   />
+
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-slate-800 truncate">{sample.name}</p>
-                    <p className="text-[10px] text-slate-400 capitalize">{sample.category}</p>
+
+                    <p className="truncate text-xs font-bold text-slate-800">
+                      {sample.name}
+                    </p>
+
+                    <p className="text-[10px] capitalize text-slate-400">
+                      {sample.category}
+                    </p>
+
                   </div>
+
                 </button>
               ))}
+
             </div>
           </div>
+
         </div>
 
-        {/* Right Column: Real-Time Results Studio */}
-        <div className="lg:col-span-7 space-y-5">
+        {/* ===================================================
+            RIGHT COLUMN
+        ==================================================== */}
+        <div className="space-y-5 lg:col-span-7">
+
+          {/* =================================================
+              LOADING
+          ================================================== */}
           {analyzing ? (
-            /* Progressive Loading State */
-            <div className="rounded-3xl bg-white p-8 border border-slate-200 shadow-sm text-center flex flex-col items-center justify-center min-h-[480px] space-y-5">
+            <div className="flex min-h-[480px] flex-col items-center justify-center space-y-5 rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+
               <div className="relative flex h-20 w-20 items-center justify-center">
-                <span className="absolute h-full w-full rounded-full bg-emerald-400/30 animate-ping" />
-                <span className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white text-3xl font-bold shadow-lg">
+
+                <span className="absolute h-full w-full animate-ping rounded-full bg-emerald-400/30" />
+
+                <span className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-3xl font-bold text-white shadow-lg">
                   ✨
                 </span>
+
               </div>
+
               <div>
+
                 <h3 className="text-lg font-bold text-slate-900">
                   Gemini Multimodal AI is Processing Waste
                 </h3>
-                <p className="text-xs text-emerald-600 font-semibold mt-2 animate-pulse bg-emerald-50 px-4 py-1.5 rounded-full inline-block">
+
+                <p className="mt-2 inline-block animate-pulse rounded-full bg-emerald-50 px-4 py-1.5 text-xs font-semibold text-emerald-600">
                   {analysisSteps[analysisStepIndex]}
                 </p>
+
               </div>
-              <p className="text-xs text-slate-400 max-w-sm">
-                Generating high-fidelity DIY blueprints, industrial circular economy pathways, and market scrap valuations in real time.
+
+              <p className="max-w-sm text-xs text-slate-400">
+                Generating material classification, upcycling ideas,
+                recycling pathways, indicative valuation and environmental
+                metrics.
               </p>
+
             </div>
+
           ) : analysisResult ? (
-            /* Complete Analysis View */
-            <div className="space-y-5 animate-fade-in">
-              {/* Material Classification Header Card */}
-              <div className="rounded-3xl bg-white p-6 border border-slate-200 shadow-sm">
+
+            /* =================================================
+               RESULTS
+            ================================================== */
+            <div className="animate-fade-in space-y-5">
+
+              {/* Classification */}
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+
                 <div className="flex flex-wrap items-start justify-between gap-4">
+
                   <div>
+
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-extrabold uppercase">
-                        {classification?.primaryMaterial || 'Waste Item'}
+
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold uppercase text-emerald-800">
+                        {classification?.primaryMaterial ||
+                          'Waste Item'}
                       </span>
+
                       {classification?.subCategory && (
-                        <span className="text-xs text-slate-400 font-medium">
+                        <span className="text-xs font-medium text-slate-400">
                           • {classification.subCategory}
                         </span>
                       )}
+
                     </div>
-                    <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 mt-2">
-                      {classification?.itemName}
+
+                    <h2 className="mt-2 text-xl font-extrabold text-slate-900 md:text-2xl">
+                      {classification?.itemName ||
+                        'Waste Material'}
                     </h2>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Condition: <strong className="text-slate-800">{classification?.condition}</strong>
-                    </p>
+
+                    {classification?.condition && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        Condition:{' '}
+                        <strong className="text-slate-800">
+                          {classification.condition}
+                        </strong>
+                      </p>
+                    )}
+
                   </div>
 
-                  {/* Purity & Recyclability Badge */}
-                  <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                  {/* Purity */}
+                  <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+
                     <div className="text-center">
+
                       <span className="text-xl font-black text-emerald-600">
-                        {classification?.purityScore || 85}%
+                        {classification?.purityScore ??
+                          85}
+                        %
                       </span>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Purity</p>
+
+                      <p className="text-[10px] font-bold uppercase text-slate-400">
+                        Purity
+                      </p>
+
                     </div>
+
                     <div className="h-8 w-px bg-slate-200" />
+
                     <div className="text-center">
-                      <span className="text-xl">♻️</span>
-                      <p className="text-[10px] font-bold text-emerald-600 uppercase">Recyclable</p>
+
+                      <span className="text-xl">
+                        ♻️
+                      </span>
+
+                      <p className="text-[10px] font-bold uppercase text-emerald-600">
+                        Recyclable
+                      </p>
+
                     </div>
+
                   </div>
+
                 </div>
 
-                {/* Summary Box */}
                 {wow?.summary && (
-                  <div className="mt-4 rounded-2xl bg-emerald-50/80 border border-emerald-100 p-3.5 text-xs text-emerald-950 font-medium leading-relaxed">
-                    💡 <strong>Wealth Opportunity:</strong> {wow.summary}
+                  <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/80 p-3.5 text-xs font-medium leading-relaxed text-emerald-950">
+                    💡 <strong>Wealth Opportunity:</strong>{' '}
+                    {wow.summary}
                   </div>
                 )}
+
               </div>
 
-              {/* Navigation Tabs for Analysis Depth */}
-              <div className="flex border-b border-slate-200 bg-white rounded-2xl p-1.5 shadow-sm overflow-x-auto no-scrollbar">
-                <button
-                  onClick={() => setActiveTab('diy')}
-                  className={`flex-1 py-2.5 px-3 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
-                    activeTab === 'diy'
+              {/* =================================================
+                  TABS
+              ================================================== */}
+              <div className="flex overflow-x-auto rounded-2xl border-b border-slate-200 bg-white p-1.5 shadow-sm">
+
+                {[
+                  ['diy', `💡 DIY Upcycling (${diyProjects.length})`],
+                  ['industrial', '🏭 Industrial Recycling'],
+                  ['valuation', '💰 Scrap Market Value'],
+                  ['calculator', '📈 Profit Calculator'],
+                ].map(([tab, label]) => (
+                  <button
+                    type="button"
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex-1 whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-bold transition-all ${activeTab === tab
                       ? 'bg-emerald-600 text-white shadow-md'
                       : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  💡 DIY Upcycling ({wow?.diyUpcycling?.length || 0})
-                </button>
-                <button
-                  onClick={() => setActiveTab('industrial')}
-                  className={`flex-1 py-2.5 px-3 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
-                    activeTab === 'industrial'
-                      ? 'bg-emerald-600 text-white shadow-md'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  🏭 Industrial Recycling
-                </button>
-                <button
-                  onClick={() => setActiveTab('valuation')}
-                  className={`flex-1 py-2.5 px-3 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
-                    activeTab === 'valuation'
-                      ? 'bg-emerald-600 text-white shadow-md'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  💰 Scrap Market Value
-                </button>
-                <button
-                  onClick={() => setActiveTab('calculator')}
-                  className={`flex-1 py-2.5 px-3 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
-                    activeTab === 'calculator'
-                      ? 'bg-emerald-600 text-white shadow-md'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  📈 Profit Calculator
-                </button>
+                      }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+
               </div>
 
-              {/* Tab 1: DIY Upcycling Projects */}
+              {/* =================================================
+                  DIY TAB
+              ================================================== */}
               {activeTab === 'diy' && (
                 <div className="space-y-4">
-                  {wow?.diyUpcycling?.map((project, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-3xl bg-white p-5 border border-slate-200 shadow-sm space-y-3"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-black">
-                              {idx + 1}
-                            </span>
-                            <h3 className="text-base font-bold text-slate-900">{project.title}</h3>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1">{project.description}</p>
-                        </div>
 
-                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                          <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
-                            ⏳ {project.timeRequired}
-                          </span>
-                          <span className="px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 text-[10px] font-bold">
-                            🎯 {project.difficulty}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Tools Needed */}
-                      {project.toolsNeeded && (
-                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">
-                            Tools:
-                          </span>
-                          {project.toolsNeeded.map((t, i) => (
-                            <span
-                              key={i}
-                              className="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 text-[11px]"
-                            >
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Step by Step Blueprint */}
-                      {project.steps && (
-                        <div className="mt-3 bg-slate-50/80 rounded-2xl p-4 space-y-2 border border-slate-100">
-                          <p className="text-xs font-bold text-slate-700">🛠️ Step-by-Step Blueprint:</p>
-                          <ol className="space-y-1.5 text-xs text-slate-600 list-decimal list-inside">
-                            {project.steps.map((step, sIdx) => (
-                              <li key={sIdx} className="leading-relaxed">
-                                {step}
-                              </li>
-                            ))}
-                          </ol>
-                        </div>
-                      )}
+                  {diyProjects.length === 0 ? (
+                    <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                      No DIY upcycling projects were returned by Gemini.
                     </div>
-                  ))}
+                  ) : (
+                    diyProjects.map((project, index) => (
+                      <div
+                        key={`${project?.title || 'project'}-${index}`}
+                        className="space-y-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+                      >
+
+                        <div className="flex items-start justify-between gap-2">
+
+                          <div>
+
+                            <div className="flex items-center gap-2">
+
+                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-black text-white">
+                                {index + 1}
+                              </span>
+
+                              <h3 className="text-base font-bold text-slate-900">
+                                {project?.title ||
+                                  'Upcycling Project'}
+                              </h3>
+
+                            </div>
+
+                            {project?.description && (
+                              <p className="mt-1 text-xs text-slate-500">
+                                {project.description}
+                              </p>
+                            )}
+
+                          </div>
+
+                          <div className="flex flex-shrink-0 flex-col items-end gap-1">
+
+                            {project?.timeRequired && (
+                              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-700">
+                                ⏳ {project.timeRequired}
+                              </span>
+                            )}
+
+                            {project?.difficulty && (
+                              <span className="rounded-full bg-teal-50 px-2.5 py-0.5 text-[10px] font-bold text-teal-700">
+                                🎯 {project.difficulty}
+                              </span>
+                            )}
+
+                          </div>
+
+                        </div>
+
+                        {/* Tools */}
+                        {safeArray(project?.toolsNeeded).length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+
+                            <span className="mr-1 text-[10px] font-bold uppercase text-slate-400">
+                              Tools:
+                            </span>
+
+                            {project.toolsNeeded.map((tool, toolIndex) => (
+                              <span
+                                key={toolIndex}
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600"
+                              >
+                                {tool}
+                              </span>
+                            ))}
+
+                          </div>
+                        )}
+
+                        {/* Steps */}
+                        {safeArray(project?.steps).length > 0 && (
+                          <div className="mt-3 space-y-2 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+
+                            <p className="text-xs font-bold text-slate-700">
+                              🛠️ Step-by-Step Blueprint
+                            </p>
+
+                            <ol className="list-decimal space-y-1.5 pl-5 text-xs text-slate-600">
+
+                              {project.steps.map(
+                                (step, stepIndex) => (
+                                  <li
+                                    key={stepIndex}
+                                    className="leading-relaxed"
+                                  >
+                                    {step}
+                                  </li>
+                                )
+                              )}
+
+                            </ol>
+
+                          </div>
+                        )}
+
+                      </div>
+                    ))
+                  )}
+
                 </div>
               )}
 
-              {/* Tab 2: Industrial Recycling */}
-              {activeTab === 'industrial' && wow?.industrialRecycling && (
-                <div className="rounded-3xl bg-white p-6 border border-slate-200 shadow-sm space-y-4">
+              {/* =================================================
+                  INDUSTRIAL TAB
+              ================================================== */}
+              {activeTab === 'industrial' && (
+                <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+
                   <div>
+
                     <h3 className="text-base font-bold text-slate-900">
                       Industrial Reprocessing & Circular Economy
                     </h3>
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                      {wow.industrialRecycling.processDescription}
+
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                      {industrialRecycling?.processDescription ||
+                        'No industrial recycling process was returned.'}
                     </p>
+
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                    <div className="p-4 rounded-2xl bg-teal-50/70 border border-teal-100">
+                  <div className="grid grid-cols-1 gap-3 pt-2 md:grid-cols-2">
+
+                    <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-4">
+
                       <span className="text-xs font-bold uppercase tracking-wider text-teal-800">
                         Commercial End Products
                       </span>
-                      <ul className="mt-2 space-y-1 text-xs text-teal-950">
-                        {wow.industrialRecycling.endProducts?.map((p, i) => (
-                          <li key={i}>• {p}</li>
-                        ))}
-                      </ul>
+
+                      {endProducts.length > 0 ? (
+                        <ul className="mt-2 space-y-1 text-xs text-teal-950">
+
+                          {endProducts.map((product, index) => (
+                            <li key={index}>
+                              • {product}
+                            </li>
+                          ))}
+
+                        </ul>
+                      ) : (
+                        <p className="mt-2 text-xs text-teal-900">
+                          No end products returned.
+                        </p>
+                      )}
+
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+
                       <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                         Market Demand
                       </span>
+
                       <p className="mt-2 text-sm font-bold text-slate-800">
-                        {wow.industrialRecycling.industrialDemand}
+                        {industrialRecycling?.industrialDemand ||
+                          'Not available'}
                       </p>
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        High buyback liquidity in local recyclers
-                      </p>
+
                     </div>
+
                   </div>
 
-                  {wow.environmentalImpact && (
-                    <div className="flex items-center justify-between p-4 rounded-2xl bg-emerald-950 text-white mt-2">
-                      <div>
-                        <span className="text-xs font-semibold text-emerald-300 uppercase">
-                          Carbon Offset
-                        </span>
-                        <p className="text-lg font-black">
-                          {wow.environmentalImpact.co2OffsetKgPerKg} kg CO2e / kg
-                        </p>
-                      </div>
-                      <span className="px-3 py-1 rounded-full bg-white/20 text-xs font-bold">
-                        {wow.environmentalImpact.ecoBadge || 'Zero Waste'}
+                  <div className="mt-2 flex items-center justify-between rounded-2xl bg-emerald-950 p-4 text-white">
+
+                    <div>
+
+                      <span className="text-xs font-semibold uppercase text-emerald-300">
+                        Carbon Offset
                       </span>
+
+                      <p className="text-lg font-black">
+                        {co2PerKg} kg CO₂e / kg
+                      </p>
+
                     </div>
-                  )}
+
+                    <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold">
+                      {environmentalImpact?.ecoBadge ||
+                        'Circular Economy'}
+                    </span>
+
+                  </div>
+
                 </div>
               )}
 
-              {/* Tab 3: Scrap Market Valuation */}
-              {activeTab === 'valuation' && wow?.scrapValuation && (
-                <div className="rounded-3xl bg-white p-6 border border-slate-200 shadow-sm space-y-4">
+              {/* =================================================
+                  VALUATION TAB
+              ================================================== */}
+              {activeTab === 'valuation' && (
+                <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+
                   <div className="flex items-center justify-between">
+
                     <div>
+
                       <h3 className="text-base font-bold text-slate-900">
-                        Indicative Scrap Market Rates (India)
+                        Indicative Scrap Market Rates
                       </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Real-time estimated scrap buyback rates
+
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        AI-generated estimate — actual rates vary by
+                        location, grade and buyer.
                       </p>
+
                     </div>
-                    <span className="text-2xl">💵</span>
+
+                    <span className="text-2xl">
+                      💵
+                    </span>
+
                   </div>
 
-                  <div className="p-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md flex items-center justify-between">
+                  <div className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 p-5 text-white shadow-md">
+
                     <div>
+
                       <span className="text-xs font-bold uppercase text-emerald-100">
                         Estimated Scrap Price Range
                       </span>
-                      <div className="text-3xl font-black mt-1">
-                        ₹{wow.scrapValuation.estimatedPricePerKgMin} - ₹
-                        {wow.scrapValuation.estimatedPricePerKgMax}{' '}
-                        <span className="text-sm font-medium">/ {wow.scrapValuation.unit}</span>
+
+                      <div className="mt-1 text-3xl font-black">
+
+                        ₹{minPrice} - ₹{maxPrice}
+
+                        <span className="ml-1 text-sm font-medium">
+                          / {scrapValuation?.unit || 'kg'}
+                        </span>
+
                       </div>
+
                     </div>
-                    <span className="text-3xl">📈</span>
+
+                    <span className="text-3xl">
+                      📈
+                    </span>
+
                   </div>
 
-                  {wow.safetyAndPrep && (
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                  {safetyTips.length > 0 && (
+                    <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+
                       <p className="text-xs font-bold text-slate-700">
-                        ✨ How to Maximize Buyback Value:
+                        ✨ How to Maximize Buyback Value
                       </p>
+
                       <ul className="space-y-1 text-xs text-slate-600">
-                        {wow.safetyAndPrep.map((tip, idx) => (
-                          <li key={idx}>✓ {tip}</li>
+
+                        {safetyTips.map((tip, index) => (
+                          <li key={index}>
+                            ✓ {tip}
+                          </li>
                         ))}
+
                       </ul>
+
                     </div>
                   )}
+
                 </div>
               )}
 
-              {/* Tab 4: Live Profitability Calculator */}
+              {/* =================================================
+                  CALCULATOR TAB
+              ================================================== */}
               {activeTab === 'calculator' && (
-                <div className="rounded-3xl bg-white p-6 border border-slate-200 shadow-sm space-y-5">
+                <div className="space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+
                   <div className="flex items-center justify-between">
+
                     <div>
+
                       <h3 className="text-base font-bold text-slate-900">
-                        Live Scrap Valuation & Earnings Calculator
+                        Scrap Valuation & Earnings Calculator
                       </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Drag the slider to calculate instant bulk scrap income
+
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        Adjust the quantity to estimate potential
+                        scrap revenue.
                       </p>
+
                     </div>
-                    <span className="text-2xl">🧮</span>
+
+                    <span className="text-2xl">
+                      🧮
+                    </span>
+
                   </div>
 
                   <div>
-                    <div className="flex justify-between items-center mb-2">
+
+                    <div className="mb-2 flex items-center justify-between">
+
                       <label className="text-xs font-bold text-slate-700">
-                        Select Quantity ({classification?.primaryMaterial || 'Waste'}):
+                        Quantity (
+                        {classification?.primaryMaterial ||
+                          'Waste'}
+                        )
                       </label>
-                      <span className="text-sm font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl">
+
+                      <span className="rounded-xl bg-emerald-50 px-3 py-1 text-sm font-black text-emerald-700">
                         {calcWeightKg} KG
                       </span>
+
                     </div>
+
                     <input
                       type="range"
                       min="1"
                       max="500"
-                      step="5"
+                      step="1"
                       value={calcWeightKg}
-                      onChange={(e) => setCalcWeightKg(parseInt(e.target.value))}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                      onChange={(event) =>
+                        setCalcWeightKg(
+                          Number(event.target.value)
+                        )
+                      }
+                      className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-200 accent-emerald-600"
                     />
+
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-100">
-                      <span className="text-[11px] font-bold text-emerald-800 uppercase">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+
+                      <span className="text-[11px] font-bold uppercase text-emerald-800">
                         Estimated Revenue
                       </span>
-                      <p className="text-2xl font-black text-emerald-950 mt-1">
-                        ₹{totalEstimatedEarnings}
+
+                      <p className="mt-1 text-2xl font-black text-emerald-950">
+                        ₹{totalEstimatedEarnings.toLocaleString(
+                          'en-IN'
+                        )}
                       </p>
+
                       <span className="text-[10px] text-emerald-700">
-                        @ ₹{avgPrice}/kg average index
+                        @ ₹{avgPrice}/kg average estimate
                       </span>
+
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-teal-50 border border-teal-100">
-                      <span className="text-[11px] font-bold text-teal-800 uppercase">
+                    <div className="rounded-2xl border border-teal-100 bg-teal-50 p-4">
+
+                      <span className="text-[11px] font-bold uppercase text-teal-800">
                         Carbon Offset
                       </span>
-                      <p className="text-2xl font-black text-teal-950 mt-1">
+
+                      <p className="mt-1 text-2xl font-black text-teal-950">
                         {totalCo2Offset} kg
                       </p>
-                      <span className="text-[10px] text-teal-700">CO2 emissions avoided</span>
+
+                      <span className="text-[10px] text-teal-700">
+                        estimated CO₂e avoided
+                      </span>
+
                     </div>
+
                   </div>
+
                 </div>
               )}
 
-              {/* One Click Marketplace Publish Card */}
+              {/* =================================================
+                  MARKETPLACE
+              ================================================== */}
               {wow?.quickListing && (
-                <div className="rounded-3xl bg-slate-950 text-white p-6 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex flex-col items-center justify-between gap-4 rounded-3xl bg-slate-950 p-6 text-white shadow-2xl md:flex-row">
+
                   <div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-black uppercase">
+
+                    <span className="rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-black uppercase text-slate-950">
                       Instant Monetization
                     </span>
-                    <h4 className="text-base font-bold text-white mt-1">
+
+                    <h4 className="mt-1 text-base font-bold text-white">
                       Ready to sell this on CleanNect Marketplace?
                     </h4>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Auto-fill listing title, category, description, and market price in 1-click.
+
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      Auto-fill listing title, category,
+                      description and estimated price.
                     </p>
+
                   </div>
 
                   <button
+                    type="button"
                     onClick={handleCreateListingFromAnalysis}
-                    className="flex-shrink-0 px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition shadow-lg active:scale-95"
+                    className="flex-shrink-0 rounded-2xl bg-emerald-500 px-5 py-3 text-xs font-bold text-slate-950 shadow-lg transition hover:bg-emerald-400 active:scale-95"
                   >
                     🛍️ Publish Listing Now →
                   </button>
+
                 </div>
               )}
+
             </div>
+
           ) : (
-            /* Empty State */
-            <div className="rounded-3xl bg-white p-8 border border-slate-200 shadow-sm text-center flex flex-col items-center justify-center min-h-[480px] space-y-3">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 text-3xl">
+
+            /* =================================================
+               EMPTY STATE
+            ================================================== */
+            <div className="flex min-h-[480px] flex-col items-center justify-center space-y-3 rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-3xl text-slate-400">
                 ✨
               </div>
+
               <h3 className="text-base font-bold text-slate-800">
                 Ready for AI Waste Inspection
               </h3>
-              <p className="text-xs text-slate-400 max-w-sm">
-                Upload a photo or choose one of the sample waste materials on the left to see live Wealth out of Waste blueprints!
+
+              <p className="max-w-sm text-xs text-slate-400">
+                Upload a photo or choose a sample waste material
+                to generate Wealth out of Waste recommendations.
               </p>
+
             </div>
           )}
+
         </div>
       </div>
     </div>
   );
-}
+} 
