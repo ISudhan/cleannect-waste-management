@@ -11,7 +11,6 @@ const storage = new CloudinaryStorage({
     transformation: [{ width: 1000, height: 1000, crop: 'limit' }],
   },
 });
-
 // If Cloudinary is not configured, use memory storage (for development)
 const memoryStorage = multer.memoryStorage();
 
@@ -28,8 +27,8 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage:
     process.env.CLOUDINARY_CLOUD_NAME &&
-    process.env.CLOUDINARY_API_KEY &&
-    process.env.CLOUDINARY_API_SECRET
+      process.env.CLOUDINARY_API_KEY &&
+      process.env.CLOUDINARY_API_SECRET
       ? storage
       : memoryStorage,
   fileFilter: fileFilter,

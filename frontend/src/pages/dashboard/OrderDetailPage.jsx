@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import apiClient from '../../lib/apiClient';
 import { useAuth } from '../../auth/AuthContext';
+import { getSocket } from '../../lib/socket';
 import LocationMap from '../../components/LocationMap';
 
 const statusFlow = ['pending', 'confirmed', 'shipped', 'delivered'];
@@ -25,7 +26,7 @@ const statusEmoji = { pending: '⏳', confirmed: '✅', shipped: '🚚', deliver
 
 function OrderDetailPage() {
   const { id } = useParams();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -45,6 +46,23 @@ function OrderDetailPage() {
   };
 
   useEffect(() => { load(); }, [id]);
+
+  // Real-time status update listener
+  useEffect(() => {
+    const socket = getSocket(token);
+    if (!socket) return;
+
+    const handleStatusChange = (data) => {
+      if (String(data.orderId) === String(id)) {
+        load();
+      }
+    };
+
+    socket.on('orderStatusChanged', handleStatusChange);
+    return () => {
+      socket.off('orderStatusChanged', handleStatusChange);
+    };
+  }, [id, token]);
 
   const updateStatus = async (status) => {
     setUpdating(true);

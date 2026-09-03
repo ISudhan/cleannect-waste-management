@@ -47,45 +47,49 @@ function ChatPage() {
   // If no messages yet, try loading the user profile for the header
   useEffect(() => {
     if (!otherUser && userId) {
-      apiClient.get(`/users/${userId}`)
+      apiClient
+        .get(`/users/${userId}`)
         .then((res) => setOtherUser(res.data?.data?.user ?? null))
         .catch(() => {});
     }
   }, [userId, otherUser]);
 
-  // Socket.io setup
+  // Socket.io setup for real-time user-to-user messaging
   useEffect(() => {
     load();
 
     const sock = getSocket(token);
     socketRef.current = sock;
 
-    // Join conversation room (sorted IDs so both sides use the same room)
+    // Join conversation room
     sock.emit('joinConversation', userId);
 
     // Real-time new message
     sock.on('newMessage', ({ message }) => {
-      // Only append if it belongs to this conversation
       const senderId = message.sender?._id ?? message.sender?.id ?? message.sender;
       const receiverId = message.receiver?._id ?? message.receiver?.id ?? message.receiver;
 
       const isRelevant =
-        (senderId === userId || receiverId === userId) ||
-        (senderId === user?.id || receiverId === user?.id);
+        senderId === userId ||
+        receiverId === userId ||
+        senderId === user?.id ||
+        receiverId === user?.id;
 
       if (isRelevant) {
         setMessages((prev) => {
-          // Avoid duplicates
-          if (prev.some((m) => m._id === message.id)) return prev;
-          return [...prev, {
-            _id: message.id,
-            sender: message.sender,
-            receiver: message.receiver,
-            content: message.content,
-            listing: message.listing,
-            isRead: message.isRead,
-            createdAt: message.createdAt,
-          }];
+          if (prev.some((m) => m._id === message.id || m._id === message._id)) return prev;
+          return [
+            ...prev,
+            {
+              _id: message.id || message._id,
+              sender: message.sender,
+              receiver: message.receiver,
+              content: message.content,
+              listing: message.listing,
+              isRead: message.isRead,
+              createdAt: message.createdAt,
+            },
+          ];
         });
       }
     });
@@ -125,6 +129,7 @@ function ChatPage() {
     if (!content.trim()) return;
     setSending(true);
     setError('');
+
     // Optimistic message
     const optimistic = {
       _id: `optimistic-${Date.now()}`,
@@ -150,15 +155,10 @@ function ChatPage() {
       const real = res.data?.data?.message;
       if (real) {
         setMessages((prev) =>
-          prev.map((m) =>
-            m._id === optimistic._id
-              ? { ...real, _id: real._id }
-              : m
-          )
+          prev.map((m) => (m._id === optimistic._id ? { ...real, _id: real._id } : m))
         );
       }
     } catch (err) {
-      // Remove optimistic on failure
       setMessages((prev) => prev.filter((m) => m._id !== optimistic._id));
       setContent(sentContent);
       setError(err.response?.data?.message || 'Failed to send message.');
@@ -187,9 +187,7 @@ function ChatPage() {
           <h1 className="text-sm font-semibold text-slate-900">
             {otherUser?.name ?? 'Conversation'}
           </h1>
-          {isTyping && (
-            <p className="text-xs text-emerald-600 animate-pulse">typing…</p>
-          )}
+          {isTyping && <p className="text-xs text-emerald-600 animate-pulse">typing…</p>}
         </div>
       </header>
 
@@ -205,10 +203,7 @@ function ChatPage() {
           messages.map((m) => {
             const own = isOwn(m);
             return (
-              <div
-                key={m._id}
-                className={`flex flex-col ${own ? 'items-end' : 'items-start'}`}
-              >
+              <div key={m._id} className={`flex flex-col ${own ? 'items-end' : 'items-start'}`}>
                 <div
                   className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
                     own
@@ -235,7 +230,12 @@ function ChatPage() {
           <input
             value={content}
             onChange={(e) => handleTyping(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e); }}}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                send(e);
+              }
+            }}
             placeholder="Type a message…"
             className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
           />
@@ -245,7 +245,12 @@ function ChatPage() {
             className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-white transition hover:bg-emerald-700 disabled:opacity-40"
           >
             <svg className="h-4 w-4 rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+              />
             </svg>
           </button>
         </div>

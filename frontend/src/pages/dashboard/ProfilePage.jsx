@@ -18,14 +18,23 @@ function ProfilePage() {
     apiClient.get('/users/profile').then((res) => {
       if (cancelled) return;
       const u = res.data?.data?.user ?? {};
+      const addrStr =
+        typeof u.address === 'object' && u.address !== null
+          ? [u.address.street, u.address.city, u.address.state, u.address.country]
+              .filter(Boolean)
+              .join(', ')
+          : typeof u.address === 'string'
+          ? u.address
+          : '';
+
       setForm({
         name: u.name || '',
         email: u.email || '',
         phone: u.phone || '',
-        address: u.address || '',
-        city: u.address?.city || '',
-        state: u.address?.state || '',
-        country: u.address?.country || 'India',
+        address: addrStr,
+        city: typeof u.address === 'object' ? u.address?.city || '' : '',
+        state: typeof u.address === 'object' ? u.address?.state || '' : '',
+        country: typeof u.address === 'object' ? u.address?.country || 'India' : 'India',
         profilePicture: u.profilePicture || '',
       });
     }).catch(() => {}).finally(() => { if (!cancelled) setLoading(false); });

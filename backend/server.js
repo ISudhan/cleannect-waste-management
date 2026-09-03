@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const passport = require('passport');
 require('dotenv').config();
+console.log('Gemini key loaded:', !!process.env.GEMINI_API_KEY);
 const connectDB = require('./config/database');
 const jwt = require('jsonwebtoken');
 const User = require('./models/User');
@@ -23,6 +24,8 @@ const offerRoutes = require('./routes/offers');
 const notificationRoutes = require('./routes/notifications');
 const analyticsRoutes = require('./routes/analytics');
 const wishlistRoutes = require('./routes/wishlist');
+const routeOptimizerRoutes = require('./routes/routeOptimizer');
+const geminiRoutes = require('./routes/gemini');
 
 // Import error handler
 const errorHandler = require('./middleware/errorHandler');
@@ -91,6 +94,22 @@ io.on('connection', (socket) => {
     const room = [socket.userId, otherUserId].sort().join('_');
     socket.leave(room);
   });
+
+  // Real-time Route Collection live updates
+  socket.on('stopCollectedBroadcast', (data) => {
+    io.emit('stopCollectedLive', {
+      ...data,
+      collectedBy: socket.userId,
+    });
+  });
+
+  // Real-time Driver GPS location broadcast
+  socket.on('updateDriverLocation', (data) => {
+    io.emit('driverMoved', {
+      ...data,
+      driverId: socket.userId,
+    });
+  });
 });
 
 // Make io accessible to routes
@@ -124,9 +143,9 @@ app.use((req, res, next) => {
 const { verifyPayment } = require('./controllers/paymentController');
 app.post('/api/payments/verify', express.raw({ type: 'application/json' }), verifyPayment);
 
-// Body parser middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Body parser middleware (support high-resolution waste photos & base64)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Passport (Google OAuth — stateless, no sessions needed)
 require('./config/passport');
@@ -149,6 +168,9 @@ app.use('/api/offers', offerRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/route-optimizer', routeOptimizerRoutes);
+app.use('/api/gemini', geminiRoutes);
+app.use('/api/chat', geminiRoutes);
 
 // 404 handler
 app.use((req, res) => {

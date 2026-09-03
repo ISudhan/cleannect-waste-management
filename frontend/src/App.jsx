@@ -21,6 +21,8 @@ import OffersPage from './pages/dashboard/OffersPage';
 import NotificationsPage from './pages/dashboard/NotificationsPage';
 import AnalyticsPage from './pages/dashboard/AnalyticsPage';
 import WishlistPage from './pages/dashboard/WishlistPage';
+import RouteOptimizerPage from './pages/dashboard/RouteOptimizerPage';
+import WasteToWealthPage from './pages/dashboard/WasteToWealthPage';
 import ProtectedRoute from './routes/ProtectedRoute';
 
 function App() {
@@ -31,6 +33,8 @@ function App() {
         {/* Public layout */}
         <Route element={<PublicLayout />}>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/route-optimizer" element={<RouteOptimizerPage />} />
+          <Route path="/wealth-out-of-waste" element={<WasteToWealthPage />} />
           <Route path="/listing/:id" element={<ListingDetailPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
@@ -49,6 +53,8 @@ function App() {
           }
         >
           <Route index element={<DashboardHomePage />} />
+          <Route path="route-optimizer" element={<RouteOptimizerPage />} />
+          <Route path="wealth-out-of-waste" element={<WasteToWealthPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="listings" element={<MyListingsPage />} />
           <Route path="listings/new" element={<ListingFormPage mode="create" />} />
